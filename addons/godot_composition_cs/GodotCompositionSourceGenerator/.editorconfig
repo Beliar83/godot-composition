@@ -1,0 +1,2 @@
+﻿[*.md]
+dotnet_diagnostic.RS2007.severity = none
