@@ -7,4 +7,4 @@ edition = "2024"
 crate-type = ["cdylib"]  # Compile this crate to a dynamic C library.
 
 [dependencies]
-godot = { git = "https://github.com/godot-rust/gdext.git", features = ["api-4-4", "register-docs"] }
+godot = { git = "https://github.com/godot-rust/gdext.git", features = ["api-4-4", "register-docs", "experimental-threads"] }
