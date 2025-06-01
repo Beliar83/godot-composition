@@ -35,6 +35,25 @@ impl NodeEntity {
         }
     }
 
+    pub fn replace_component(&mut self, mut component_with_class: ComponentWithClass) -> bool {
+        if self.components.contains(&component_with_class) {
+            component_with_class
+                .component
+                .bind_mut()
+                .set_node_entity(Some(self.to_gd()));
+            if let Some(mut old_component) = self.components.replace(component_with_class.clone()) {
+                old_component.component.bind_mut().set_node_entity(None);
+            }
+            self.signals().component_replaced().emit(
+                &component_with_class.component_class,
+                &component_with_class.component,
+            );
+            true
+        } else {
+            false
+        }
+    }
+
     fn set_entity_of_component_to_self(&self, component: &Gd<Component>) {
         Callable::from_local_fn("set_component_entity", move |args| {
             let entity = args
@@ -68,6 +87,10 @@ impl NodeEntity {
     #[signal]
     /// Emitted when a component was added to this Entity
     fn component_added(component_class: StringName, component: Gd<Component>);
+
+    #[signal]
+    /// Emitted when a component was replaced on this Entity
+    fn component_replaced(component_class: StringName, component: Gd<Component>);
 
     #[func]
     /// Execute a callable for all components of this Entity

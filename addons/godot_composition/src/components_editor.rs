@@ -5,8 +5,8 @@ use crate::property_info::create_property_from_dictionary;
 use godot::classes::box_container::AlignmentMode;
 use godot::classes::control::{LayoutPreset, SizeFlags};
 use godot::classes::{
-    Button, ClassDb, EditorInspector, EditorInterface, Engine, HBoxContainer, IPanelContainer,
-    Label, PanelContainer, PopupMenu, ResourceLoader, Script, VBoxContainer,
+    Button, ClassDb, EditorInspector, EditorInterface, HBoxContainer, IPanelContainer, Label,
+    PanelContainer, PopupMenu, ResourceLoader, Script, VBoxContainer,
 };
 use godot::global::{HorizontalAlignment, PropertyUsageFlags};
 use godot::prelude::*;
@@ -22,6 +22,8 @@ enum ComponentType {
 pub struct ComponentsEditor {
     node: Option<Gd<Node>>,
     components: HashMap<StringName, Gd<Component>>,
+    paste_components_button: Option<Gd<Button>>,
+    paste_values_button: Option<Gd<Button>>,
     base: Base<PanelContainer>,
 }
 
@@ -31,6 +33,8 @@ impl ComponentsEditor {
         let mut instance = Gd::from_init_fn(|base| Self {
             components: HashMap::new(),
             node: Some(node),
+            paste_components_button: None,
+            paste_values_button: None,
             base,
         });
         instance.call_deferred("setup_ui", &[]);
@@ -42,14 +46,70 @@ impl ComponentsEditor {
 #[godot_api]
 impl ComponentsEditor {
     #[func]
+    fn store_components(&mut self) {
+        if let Some(mut plugin) = GodotCompositionEditorPlugin::get_instance() {
+            let node = match &self.node {
+                None => {
+                    return;
+                }
+                Some(node) => node,
+            };
+            let node_entity = match GodotCompositionWorld::get_singleton()
+                .bind()
+                .get_node_entity_or_null(node.clone())
+            {
+                None => {
+                    return;
+                }
+                Some(node_entity) => node_entity,
+            };
+            plugin.bind_mut().store_components(node_entity);
+            if let Some(ref mut paste_button) = self.paste_components_button {
+                paste_button.set_disabled(false);
+            }
+            if let Some(ref mut paste_button) = self.paste_values_button {
+                paste_button.set_disabled(false);
+            }
+        }
+    }
+
+    fn paste_components(&mut self) {
+        if let Some(plugin) = GodotCompositionEditorPlugin::get_instance() {
+            let node = match &mut self.node {
+                None => {
+                    return;
+                }
+                Some(node) => node,
+            };
+
+            plugin.bind().paste_component(node.clone());
+            node.notify_property_list_changed();
+        }
+    }
+
+    fn paste_values(&mut self) {
+        if let Some(plugin) = GodotCompositionEditorPlugin::get_instance() {
+            let node = match &mut self.node {
+                None => {
+                    return;
+                }
+                Some(node) => node,
+            };
+
+            plugin.bind().paste_values(node.clone());
+            node.notify_property_list_changed();
+        }
+    }
+
+    #[func]
     fn setup_ui(&mut self) {
         let mut world = GodotCompositionWorld::get_singleton();
         let node = self.node.clone().expect("Node was not set");
         let mut main_container = VBoxContainer::new_alloc();
         self.components.clear();
         let mut node_entity = world.bind_mut().get_or_create_node_entity(node.clone());
-        let set = &node_entity.bind_mut().components;
-        for component in set.iter() {
+        let components = &node_entity.bind_mut().components.clone();
+        for component in components.iter() {
             let name = component.component_class.clone();
             let component = &component.component;
             self.components.insert(name.clone(), component.clone());
@@ -106,12 +166,13 @@ impl ComponentsEditor {
             remove_button.add_theme_stylebox_override("hover_pressed_mirrored", &stylebox);
             remove_button.add_theme_stylebox_override("pressed_mirrored", &stylebox);
             remove_button.set_h_size_flags(SizeFlags::FILL);
-            let node = node.clone();
+            let mut node = node.clone();
             let mut world = world.clone();
             remove_button.signals().pressed().connect(move || {
                 world
                     .bind_mut()
                     .remove_component_from_node(node.clone(), name.clone());
+                node.notify_property_list_changed();
             });
 
             header_layout.add_child(&remove_button);
@@ -147,7 +208,10 @@ impl ComponentsEditor {
                             editor.set_label(&property.property_name.to_string());
                             let mut component = component.clone();
                             editor.signals().property_changed().connect(
-                                move |path, value, _, _| component.set_deferred(&path, &value),
+                                move |path, value, _, _| {
+                                    component.set_deferred(&path, &value);
+                                    EditorInterface::singleton().mark_scene_as_unsaved();
+                                },
                             );
                             property_editors.add_child(&editor);
                         }
@@ -180,7 +244,10 @@ impl ComponentsEditor {
                                 editor.set_label(&property.property_name.to_string());
                                 let mut component = component.clone();
                                 editor.signals().property_changed().connect(
-                                    move |path, value, _, _| component.set_deferred(&path, &value),
+                                    move |path, value, _, _| {
+                                        component.set_deferred(&path, &value);
+                                        EditorInterface::singleton().mark_scene_as_unsaved();
+                                    },
                                 );
                                 property_editors.add_child(&editor);
                             }
@@ -200,10 +267,50 @@ impl ComponentsEditor {
         add_component_button.set_text("Add component");
         main_container.add_child(&add_component_button);
 
-        self.update_menu(world, menu, add_component_button);
+        self.update_menu(world.clone(), menu, add_component_button);
 
         self.base_mut()
             .set_anchors_preset(LayoutPreset::HCENTER_WIDE);
+
+        let mut copy_button = Button::new_alloc();
+        copy_button.set_text("Copy Components");
+        copy_button
+            .signals()
+            .pressed()
+            .connect_other(self, Self::store_components);
+
+        copy_button.set_disabled(node_entity.bind().components.is_empty());
+
+        main_container.add_child(&copy_button);
+
+        let mut paste_components_button = Button::new_alloc();
+        paste_components_button.set_text("Paste Components");
+        paste_components_button
+            .signals()
+            .pressed()
+            .connect_other(self, Self::paste_components);
+
+        let editor_plugin = GodotCompositionEditorPlugin::get_instance().expect("No editor plugin");
+        paste_components_button.set_disabled(!editor_plugin.bind().has_stored_component());
+
+        main_container.add_child(&paste_components_button);
+
+        self.paste_components_button = Some(paste_components_button);
+
+        let mut paste_values_button = Button::new_alloc();
+        paste_values_button.set_text("Paste values");
+        paste_values_button
+            .signals()
+            .pressed()
+            .connect_other(self, Self::paste_values);
+
+        let editor_plugin = GodotCompositionEditorPlugin::get_instance().expect("No editor plugin");
+        paste_values_button.set_disabled(!editor_plugin.bind().has_stored_component());
+
+        main_container.add_child(&paste_values_button);
+
+        self.paste_values_button = Some(paste_values_button);
+
         self.base_mut().add_child(&main_container);
     }
 
@@ -213,14 +320,7 @@ impl ComponentsEditor {
         mut menu: Gd<PopupMenu>,
         mut button: Gd<Button>,
     ) {
-        if let Some(plugin) = Engine::singleton()
-            .get_singleton(&GodotCompositionEditorPlugin::class_name().to_string_name())
-            .map(|plugin| {
-                plugin.try_cast::<GodotCompositionEditorPlugin>().expect(
-                    "GodotCompositionEditorPlugin singleton was not a GodotCompositionEditorPlugin",
-                )
-            })
-        {
+        if let Some(plugin) = GodotCompositionEditorPlugin::get_instance() {
             let mut possible_components: HashMap<i32, ComponentType> = HashMap::new();
             let mut index: i32 = 0;
 

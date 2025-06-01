@@ -25,7 +25,7 @@ checksum = "6b46b9ca4690308844c644e7c634d68792467260e051c8543e0c7871662b3ba7"
 [[package]]
 name = "godot"
 version = "0.2.4"
-source = "git+https://github.com/godot-rust/gdext.git#4a6f8033c0f117eff288183adb4c35b8874f718e"
+source = "git+https://github.com/godot-rust/gdext.git#d1874f3c107910b445da2966dfd4d08a562b2204"
 dependencies = [
  "godot-core",
  "godot-macros",
@@ -34,7 +34,7 @@ dependencies = [
 [[package]]
 name = "godot-bindings"
 version = "0.2.4"
-source = "git+https://github.com/godot-rust/gdext.git#4a6f8033c0f117eff288183adb4c35b8874f718e"
+source = "git+https://github.com/godot-rust/gdext.git#d1874f3c107910b445da2966dfd4d08a562b2204"
 dependencies = [
  "gdextension-api",
 ]
@@ -42,12 +42,12 @@ dependencies = [
 [[package]]
 name = "godot-cell"
 version = "0.2.4"
-source = "git+https://github.com/godot-rust/gdext.git#4a6f8033c0f117eff288183adb4c35b8874f718e"
+source = "git+https://github.com/godot-rust/gdext.git#d1874f3c107910b445da2966dfd4d08a562b2204"
 
 [[package]]
 name = "godot-codegen"
 version = "0.2.4"
-source = "git+https://github.com/godot-rust/gdext.git#4a6f8033c0f117eff288183adb4c35b8874f718e"
+source = "git+https://github.com/godot-rust/gdext.git#d1874f3c107910b445da2966dfd4d08a562b2204"
 dependencies = [
  "godot-bindings",
  "heck",
@@ -60,7 +60,7 @@ dependencies = [
 [[package]]
 name = "godot-core"
 version = "0.2.4"
-source = "git+https://github.com/godot-rust/gdext.git#4a6f8033c0f117eff288183adb4c35b8874f718e"
+source = "git+https://github.com/godot-rust/gdext.git#d1874f3c107910b445da2966dfd4d08a562b2204"
 dependencies = [
  "glam",
  "godot-bindings",
@@ -72,7 +72,7 @@ dependencies = [
 [[package]]
 name = "godot-ffi"
 version = "0.2.4"
-source = "git+https://github.com/godot-rust/gdext.git#4a6f8033c0f117eff288183adb4c35b8874f718e"
+source = "git+https://github.com/godot-rust/gdext.git#d1874f3c107910b445da2966dfd4d08a562b2204"
 dependencies = [
  "godot-bindings",
  "godot-codegen",
@@ -83,7 +83,7 @@ dependencies = [
 [[package]]
 name = "godot-macros"
 version = "0.2.4"
-source = "git+https://github.com/godot-rust/gdext.git#4a6f8033c0f117eff288183adb4c35b8874f718e"
+source = "git+https://github.com/godot-rust/gdext.git#d1874f3c107910b445da2966dfd4d08a562b2204"
 dependencies = [
  "godot-bindings",
  "libc",

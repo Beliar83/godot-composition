@@ -17,6 +17,7 @@ public partial class NodeEntity
     {
         ComponentAdded += OnComponentAdded;
         ComponentRemoved += OnComponentRemoved;
+        ComponentReplaced += OnComponentReplaced;
     }
 
     /// <inheritdoc />
@@ -26,6 +27,7 @@ public partial class NodeEntity
         {
             ComponentAdded -= OnComponentAdded;
             ComponentRemoved -= OnComponentRemoved;
+            ComponentReplaced -= OnComponentReplaced;
         }
         catch (ObjectDisposedException)
         { }
@@ -54,6 +56,14 @@ public partial class NodeEntity
     private void OnComponentRemoved(StringName componentClass)
     {
         components.Remove(componentClass);
+    }
+
+    /// <summary>
+    ///     /// Emitted when a component was replaced on this Entity
+    /// </summary>
+    private void OnComponentReplaced(StringName componentClass, Component component)
+    {
+        components[componentClass] = component;
     }
 
 

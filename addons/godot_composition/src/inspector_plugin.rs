@@ -23,8 +23,7 @@ impl IEditorInspectorPlugin for InspectorPlugin {
             None => {}
             Some(object) => {
                 if let Ok(node) = object.try_cast::<Node>() {
-                    let components_editor = ComponentsEditor::create_for_node(node);
-
+                    let components_editor = ComponentsEditor::create_for_node(node.clone());
                     self.base_mut().add_custom_control(&components_editor);
                 }
             }

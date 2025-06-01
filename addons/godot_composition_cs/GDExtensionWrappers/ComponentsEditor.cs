@@ -49,6 +49,12 @@ public partial class ComponentsEditor : PanelContainer
 
     #region Methods
 
+    public void StoreComponents()
+    {
+        Call(_cached_store_components);
+    }
+
+
     public void SetupUi()
     {
         Call(_cached_setup_ui);
@@ -56,5 +62,6 @@ public partial class ComponentsEditor : PanelContainer
 
     #endregion
 
+    private static readonly StringName _cached_store_components = "store_components";
     private static readonly StringName _cached_setup_ui = "setup_ui";
 }

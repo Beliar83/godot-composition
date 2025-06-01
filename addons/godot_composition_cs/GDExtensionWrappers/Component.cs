@@ -67,10 +67,6 @@ public partial class Component : RefCounted
     }
 
 
-    /// <summary>
-    ///     Gets the NodeEntity of this Component. Warning: Calling this in _Process or _PhysicsProcess of the component will
-    ///     result in an error
-    /// </summary>
     public NodeEntity GetNodeEntity()
     {
         return NodeEntity.Bind(Call(_cached_get_node_entity).As<GodotObject>());

@@ -15,6 +15,7 @@ const NODE_ENTITIES_META_NAME: &str = "godot_composition_node_entities";
 pub struct GodotCompositionWorld {
     to_add: RwLock<HashSet<ComponentWithClassForNode>>,
     to_remove: RwLock<HashSet<ComponentWithClassForNode>>,
+    to_replace: RwLock<HashSet<ComponentWithClassForNode>>,
     instances_by_component_class_godot: HashMap<StringName, Array<Gd<Component>>>,
     all_instances_internal: Vec<(Gd<NodeEntity>, Gd<Node>, Gd<Component>)>,
     pub(crate) all_instances: Dictionary,
@@ -49,6 +50,14 @@ impl GodotCompositionWorld {
     #[signal]
     /// Emitted when a component is removed from a node
     pub fn component_removed(
+        node_entity: Gd<NodeEntity>,
+        component_class: StringName,
+        component: Gd<Component>,
+    );
+
+    #[signal]
+    /// Emitted when a component is replaced in a node
+    pub fn component_replaced(
         node_entity: Gd<NodeEntity>,
         component_class: StringName,
         component: Gd<Component>,
@@ -175,6 +184,7 @@ impl GodotCompositionWorld {
         }
         scene.remove_meta(NODE_ENTITIES_META_NAME);
     }
+
     #[func]
     /// Adds a component to a node
     pub fn add_component_to_node(
@@ -225,8 +235,8 @@ impl GodotCompositionWorld {
         }
     }
 
-    /// Removes the component from the node, if present
     #[func]
+    /// Removes the component from the node, if present
     pub fn remove_component_from_node(
         &mut self,
         node: Gd<Node>,
@@ -274,6 +284,72 @@ impl GodotCompositionWorld {
         } else {
             godot_warn!("Node {} does have any entities", node.get_name());
             false
+        }
+    }
+
+    #[func]
+    /// Replaces an existing component of a node
+    pub fn replace_component_of_node(
+        &mut self,
+        component: Gd<Component>,
+        node: Gd<Node>,
+        component_class: StringName,
+    ) -> bool {
+        let entity = match self.node_entities.get(&node.instance_id()) {
+            None => {
+                godot_warn!("Node {} does not have an entity", node.get_name());
+                return false;
+            }
+            Some(entity) => entity,
+        };
+
+        if !entity
+            .bind()
+            .has_component_of_class(component_class.clone())
+        {
+            godot_warn!(
+                "Node {} does not have the component  {}",
+                node.get_name(),
+                component_class
+            );
+            return false;
+        }
+
+        let to_replace = self.to_replace.get_mut().unwrap_or_else(|err| {
+            godot_warn!(
+                            "The lock for the to_replace queue was poisoned. A component might not have been replaced"
+                        );
+            err.into_inner()
+        });
+
+        let component_with_class = ComponentWithClass::create(component_class, component);
+
+        let to_replace_data = ComponentWithClassForNode {
+            node,
+            component_with_class,
+        };
+
+        if to_replace.contains(&to_replace_data) {
+            godot_warn!(
+                "Component {} was already marked as to be replaced for {}",
+                to_replace_data.component_with_class.component_class,
+                to_replace_data.node.get_name()
+            );
+            self.to_replace.clear_poison();
+            false
+        } else {
+            to_replace.insert(to_replace_data);
+            self.to_replace.clear_poison();
+            true
+        }
+    }
+
+    #[func]
+    /// Returns if the node has a component of the given component class
+    pub fn node_has_component_of_class(&self, node: Gd<Node>, component_class: StringName) -> bool {
+        match self.node_entities.get(&node.instance_id()) {
+            None => false,
+            Some(node_entity) => node_entity.bind().has_component_of_class(component_class),
         }
     }
 
@@ -406,6 +482,35 @@ impl GodotCompositionWorld {
                     .component_class
                     .clone(),
             );
+        }
+
+        let to_replace: Vec<ComponentWithClassForNode> = match self.to_replace.get_mut() {
+            Ok(to_replace) => to_replace.drain().collect(),
+            Err(err) => {
+                godot_warn!(
+                    "The lock for the to_replace queue was poisoned. A component might not have been replaced"
+                );
+                err.into_inner().drain().collect()
+            }
+        };
+
+        self.to_replace.clear_poison();
+
+        for component_with_class_for_node in to_replace {
+            let component_with_class = &component_with_class_for_node.component_with_class;
+            let component_class = component_with_class.component_class.clone();
+            let mut node_entity =
+                self.get_or_create_node_entity(component_with_class_for_node.node);
+            node_entity
+                .bind_mut()
+                .replace_component(component_with_class.clone());
+            changed_component_classes.insert(component_class.clone());
+            self.signals().component_replaced().emit(
+                &node_entity.clone(),
+                &component_class.clone(),
+                &component_with_class_for_node.component_with_class.component,
+            );
+            changed_nodes.insert(node_entity.clone());
         }
 
         let to_add: Vec<ComponentWithClassForNode> = match self.to_add.get_mut() {

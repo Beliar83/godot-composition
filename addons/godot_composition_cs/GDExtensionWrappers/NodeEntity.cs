@@ -65,9 +65,6 @@ public partial class NodeEntity : RefCounted
     private ComponentRemovedHandler _componentRemoved_backing;
     private Callable _componentRemoved_backing_callable;
 
-    /// <summary>
-    ///     Emitted when a component was removed from this Entity
-    /// </summary>
     public event ComponentRemovedHandler ComponentRemoved
     {
         add
@@ -104,9 +101,6 @@ public partial class NodeEntity : RefCounted
     private ComponentAddedHandler _componentAdded_backing;
     private Callable _componentAdded_backing_callable;
 
-    /// <summary>
-    ///     Emitted when a component was added to this Entity
-    /// </summary>
     public event ComponentAddedHandler ComponentAdded
     {
         add
@@ -131,55 +125,70 @@ public partial class NodeEntity : RefCounted
         }
     }
 
+    private void componentReplacedCall(StringName componentClass, Component component)
+    {
+        StringName arg0 = componentClass;
+        Component arg1 = GDExtensionHelper.Bind<Component>(component);
+        _componentReplaced_backing?.Invoke(arg0, arg1);
+    }
+
+    public delegate void ComponentReplacedHandler(StringName componentClass, Component component);
+
+    private ComponentReplacedHandler _componentReplaced_backing;
+    private Callable _componentReplaced_backing_callable;
+
+    public event ComponentReplacedHandler ComponentReplaced
+    {
+        add
+        {
+            if (_componentReplaced_backing == null)
+            {
+                _componentReplaced_backing_callable = new Callable(this, MethodName.componentReplacedCall);
+                Connect(_cached_component_replaced, _componentReplaced_backing_callable);
+            }
+
+            _componentReplaced_backing += value;
+        }
+        remove
+        {
+            _componentReplaced_backing -= value;
+
+            if (_componentReplaced_backing == null)
+            {
+                Disconnect(_cached_component_replaced, _componentReplaced_backing_callable);
+                _componentReplaced_backing_callable = default;
+            }
+        }
+    }
+
     #endregion
 
     #region Methods
 
-    /// <summary>
-    ///     Execute a callable for all components of this Entity
-    ///     The signature of the callable must be:
-    ///     (component_class: StringName, component: Component)
-    /// </summary>
     public void DoForAllComponents(Callable func)
     {
         Call(_cached_do_for_all_components, func);
     }
 
 
-    /// <summary>
-    ///     Return all components as a list of dictionaries
-    /// </summary>
     public Array<Dictionary> GetAllComponents()
     {
         return Call(_cached_get_all_components).As<Array<Dictionary>>();
     }
 
 
-    /// <summary>
-    ///     Sets components from a list of dictionaries
-    /// </summary>
     public Array<StringName> SetComponents(Array<Dictionary> components)
     {
         return Call(_cached_set_components, components).As<Array<StringName>>();
     }
 
 
-    /// <summary>
-    ///     Returns if the Entity has a component of the given component class
-    /// </summary>
-    /// <param name="componentClass"></param>
-    /// <returns></returns>
     public bool HasComponentOfClass(StringName componentClass)
     {
         return Call(_cached_has_component_of_class, componentClass).As<bool>();
     }
 
 
-    /// <summary>
-    ///     Returns the component of the given component class, or null if the Entity does not have a component of that class
-    /// </summary>
-    /// <param name="componentClass"></param>
-    /// <returns></returns>
     public Component GetComponentOfClassOrNull(StringName componentClass)
     {
         return Component.Bind(Call(_cached_get_component_of_class_or_null, componentClass).As<GodotObject>());
@@ -209,4 +218,5 @@ public partial class NodeEntity : RefCounted
     private static readonly StringName _cached_set_node = "set_node";
     private static readonly StringName _cached_component_removed = "component_removed";
     private static readonly StringName _cached_component_added = "component_added";
+    private static readonly StringName _cached_component_replaced = "component_replaced";
 }
