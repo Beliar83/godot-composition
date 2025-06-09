@@ -171,7 +171,7 @@ impl ComponentsEditor {
             remove_button.signals().pressed().connect(move || {
                 world
                     .bind_mut()
-                    .remove_component_from_node(node.clone(), name.clone());
+                    .set_component_of_node(node.clone(), name.clone(), None);
                 node.notify_property_list_changed();
             });
 
@@ -375,9 +375,11 @@ impl ComponentsEditor {
                         (component, name)
                     }
                 };
-                world
-                    .bind_mut()
-                    .add_component_to_node(component, selected_node.clone(), name);
+                world.bind_mut().set_component_of_node(
+                    selected_node.clone(),
+                    name,
+                    Some(component),
+                );
                 selected_node.notify_property_list_changed();
             });
         }

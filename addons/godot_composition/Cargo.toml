@@ -1,10 +1,10 @@
-[package]
-name = "godot_composition"
-version = "0.1.0"
-edition = "2024"
+[workspace]
+resolver = "3"
+members = [
+    "godot_composition_core",
+    "godot_composition",
+    "godot_composition_tests"
+]
 
-[lib]
-crate-type = ["cdylib"]  # Compile this crate to a dynamic C library.
-
-[dependencies]
-godot = { git = "https://github.com/godot-rust/gdext.git", features = ["api-4-4", "register-docs", "experimental-threads"] }
+[workspace.dependencies]
+godot = { version = "0.3.0", features = ["api-4-4", "register-docs", "experimental-threads"] }

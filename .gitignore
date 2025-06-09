@@ -400,3 +400,5 @@ FodyWeavers.xsd
 *.sln.iml
 # Godot 4+ specific ignores
 .godot/
+/addons/godot_composition/Cargo.lock
+/addons/godot_composition/godot_composition_core/Cargo.lock

@@ -1,0 +1,11 @@
+[package]
+name = "godot_composition"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]  # Compile this crate to a dynamic C library.
+
+[dependencies]
+godot = { workspace = true }
+godot-composition-core = { path = "../godot_composition_core" }

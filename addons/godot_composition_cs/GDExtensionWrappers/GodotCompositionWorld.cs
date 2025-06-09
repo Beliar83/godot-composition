@@ -86,114 +86,42 @@ public partial class GodotCompositionWorld : Node
         }
     }
 
-    private void componentAddedCall(NodeEntity nodeEntity, StringName componentClass, Component component)
+    private void componentChangedCall(NodeEntity nodeEntity, StringName componentClass, Component component,
+        Component oldComponent)
     {
         NodeEntity arg0 = GDExtensionHelper.Bind<NodeEntity>(nodeEntity);
         StringName arg1 = componentClass;
         Component arg2 = GDExtensionHelper.Bind<Component>(component);
-        _componentAdded_backing?.Invoke(arg0, arg1, arg2);
+        Component arg3 = GDExtensionHelper.Bind<Component>(oldComponent);
+        _componentChanged_backing?.Invoke(arg0, arg1, arg2, arg3);
     }
 
-    public delegate void ComponentAddedHandler(NodeEntity nodeEntity, StringName componentClass, Component component);
+    public delegate void ComponentChangedHandler(NodeEntity nodeEntity, StringName componentClass, Component component,
+        Component oldComponent);
 
-    private ComponentAddedHandler _componentAdded_backing;
-    private Callable _componentAdded_backing_callable;
+    private ComponentChangedHandler _componentChanged_backing;
+    private Callable _componentChanged_backing_callable;
 
-    public event ComponentAddedHandler ComponentAdded
+    public event ComponentChangedHandler ComponentChanged
     {
         add
         {
-            if (_componentAdded_backing == null)
+            if (_componentChanged_backing == null)
             {
-                _componentAdded_backing_callable = new Callable(this, MethodName.componentAddedCall);
-                Connect(_cached_component_added, _componentAdded_backing_callable);
+                _componentChanged_backing_callable = new Callable(this, MethodName.componentChangedCall);
+                Connect(_cached_component_changed, _componentChanged_backing_callable);
             }
 
-            _componentAdded_backing += value;
+            _componentChanged_backing += value;
         }
         remove
         {
-            _componentAdded_backing -= value;
+            _componentChanged_backing -= value;
 
-            if (_componentAdded_backing == null)
+            if (_componentChanged_backing == null)
             {
-                Disconnect(_cached_component_added, _componentAdded_backing_callable);
-                _componentAdded_backing_callable = default;
-            }
-        }
-    }
-
-    private void componentRemovedCall(NodeEntity nodeEntity, StringName componentClass, Component component)
-    {
-        NodeEntity arg0 = GDExtensionHelper.Bind<NodeEntity>(nodeEntity);
-        StringName arg1 = componentClass;
-        Component arg2 = GDExtensionHelper.Bind<Component>(component);
-        _componentRemoved_backing?.Invoke(arg0, arg1, arg2);
-    }
-
-    public delegate void ComponentRemovedHandler(NodeEntity nodeEntity, StringName componentClass, Component component);
-
-    private ComponentRemovedHandler _componentRemoved_backing;
-    private Callable _componentRemoved_backing_callable;
-
-    public event ComponentRemovedHandler ComponentRemoved
-    {
-        add
-        {
-            if (_componentRemoved_backing == null)
-            {
-                _componentRemoved_backing_callable = new Callable(this, MethodName.componentRemovedCall);
-                Connect(_cached_component_removed, _componentRemoved_backing_callable);
-            }
-
-            _componentRemoved_backing += value;
-        }
-        remove
-        {
-            _componentRemoved_backing -= value;
-
-            if (_componentRemoved_backing == null)
-            {
-                Disconnect(_cached_component_removed, _componentRemoved_backing_callable);
-                _componentRemoved_backing_callable = default;
-            }
-        }
-    }
-
-    private void componentReplacedCall(NodeEntity nodeEntity, StringName componentClass, Component component)
-    {
-        NodeEntity arg0 = GDExtensionHelper.Bind<NodeEntity>(nodeEntity);
-        StringName arg1 = componentClass;
-        Component arg2 = GDExtensionHelper.Bind<Component>(component);
-        _componentReplaced_backing?.Invoke(arg0, arg1, arg2);
-    }
-
-    public delegate void
-        ComponentReplacedHandler(NodeEntity nodeEntity, StringName componentClass, Component component);
-
-    private ComponentReplacedHandler _componentReplaced_backing;
-    private Callable _componentReplaced_backing_callable;
-
-    public event ComponentReplacedHandler ComponentReplaced
-    {
-        add
-        {
-            if (_componentReplaced_backing == null)
-            {
-                _componentReplaced_backing_callable = new Callable(this, MethodName.componentReplacedCall);
-                Connect(_cached_component_replaced, _componentReplaced_backing_callable);
-            }
-
-            _componentReplaced_backing += value;
-        }
-        remove
-        {
-            _componentReplaced_backing -= value;
-
-            if (_componentReplaced_backing == null)
-            {
-                Disconnect(_cached_component_replaced, _componentReplaced_backing_callable);
-                _componentReplaced_backing_callable = default;
+                Disconnect(_cached_component_changed, _componentChanged_backing_callable);
+                _componentChanged_backing_callable = default;
             }
         }
     }
@@ -251,21 +179,9 @@ public partial class GodotCompositionWorld : Node
     }
 
 
-    public bool AddComponentToNode(Component component, Node node, StringName componentClass)
+    public bool SetComponentOfNode(Node node, StringName componentClass, Component component)
     {
-        return Call(_cached_add_component_to_node, (RefCounted)component, node, componentClass).As<bool>();
-    }
-
-
-    public bool RemoveComponentFromNode(Node node, StringName componentClass)
-    {
-        return Call(_cached_remove_component_from_node, node, componentClass).As<bool>();
-    }
-
-
-    public bool ReplaceComponentOfNode(Component component, Node node, StringName componentClass)
-    {
-        return Call(_cached_replace_component_of_node, (RefCounted)component, node, componentClass).As<bool>();
+        return Call(_cached_set_component_of_node, node, componentClass, (RefCounted)component).As<bool>();
     }
 
 
@@ -287,9 +203,9 @@ public partial class GodotCompositionWorld : Node
     }
 
 
-    public Array<NodeEntity> GetAllNodeEntity()
+    public Array<NodeEntity> GetAllNodeEntities()
     {
-        return GDExtensionHelper.Cast<NodeEntity>(Call(_cached_get_all_node_entity).As<Array<GodotObject>>());
+        return GDExtensionHelper.Cast<NodeEntity>(Call(_cached_get_all_node_entities).As<Array<GodotObject>>());
     }
 
 
@@ -308,19 +224,15 @@ public partial class GodotCompositionWorld : Node
     private static readonly StringName _cached_store_entities_to_scene = "store_entities_to_scene";
     private static readonly StringName _cached_set_entities_from_scene = "set_entities_from_scene";
     private static readonly StringName _cached_clear_entities_from_scene = "clear_entities_from_scene";
-    private static readonly StringName _cached_add_component_to_node = "add_component_to_node";
-    private static readonly StringName _cached_remove_component_from_node = "remove_component_from_node";
-    private static readonly StringName _cached_replace_component_of_node = "replace_component_of_node";
+    private static readonly StringName _cached_set_component_of_node = "set_component_of_node";
     private static readonly StringName _cached_node_has_component_of_class = "node_has_component_of_class";
     private static readonly StringName _cached_get_or_create_node_entity = "get_or_create_node_entity";
     private static readonly StringName _cached_get_node_entity_or_null = "get_node_entity_or_null";
-    private static readonly StringName _cached_get_all_node_entity = "get_all_node_entity";
+    private static readonly StringName _cached_get_all_node_entities = "get_all_node_entities";
 
     private static readonly StringName _cached_remove_all_entities_and_pending_changes =
         "remove_all_entities_and_pending_changes";
 
     private static readonly StringName _cached_node_entity_created = "node_entity_created";
-    private static readonly StringName _cached_component_added = "component_added";
-    private static readonly StringName _cached_component_removed = "component_removed";
-    private static readonly StringName _cached_component_replaced = "component_replaced";
+    private static readonly StringName _cached_component_changed = "component_changed";
 }

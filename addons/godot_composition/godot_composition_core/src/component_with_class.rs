@@ -11,7 +11,7 @@ static COMPONENT_STRING_NAME: LazyLock<StringName> =
     LazyLock::new(|| StringName::from(COMPONENT_NAME));
 
 #[derive(Clone, Eq, Default)]
-pub(crate) struct ComponentWithClass {
+pub struct ComponentWithClass {
     pub component_class: StringName,
     pub component: Gd<Component>,
 }
@@ -92,10 +92,4 @@ impl FromGodot for ComponentWithClass {
             Err(ConvertError::new("Dictionary does not contain all keys"))
         }
     }
-}
-
-#[derive(Clone, Hash, PartialEq, Eq)]
-pub(crate) struct ComponentWithClassForNode {
-    pub component_with_class: ComponentWithClass,
-    pub node: Gd<Node>,
 }

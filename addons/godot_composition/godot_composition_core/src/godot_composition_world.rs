@@ -1,21 +1,41 @@
 use crate::component::Component;
-use crate::component_with_class::{ComponentWithClass, ComponentWithClassForNode};
 use crate::node_entity::NodeEntity;
 use godot::classes::Engine;
 use godot::prelude::*;
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::sync::RwLock;
 
 const COMPONENTS_META_NAME: &str = "godot_composition_components";
 const NODE_ENTITIES_META_NAME: &str = "godot_composition_node_entities";
 
+#[derive(Clone)]
+pub(crate) struct StagedComponentChange {
+    pub(crate) component_class: StringName,
+    pub(crate) component: Option<Gd<Component>>,
+    pub(crate) node: Gd<Node>,
+}
+
+impl Hash for StagedComponentChange {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Hash::hash(&self.component_class, state);
+        Hash::hash(&self.node, state);
+    }
+}
+
+impl PartialEq for StagedComponentChange {
+    fn eq(&self, other: &Self) -> bool {
+        self.component_class == other.component_class && self.node == other.node
+    }
+}
+
+impl Eq for StagedComponentChange {}
+
 #[derive(GodotClass)]
 #[class(init, base=Node, tool)]
 /// Manages components of nodes
 pub struct GodotCompositionWorld {
-    to_add: RwLock<HashSet<ComponentWithClassForNode>>,
-    to_remove: RwLock<HashSet<ComponentWithClassForNode>>,
-    to_replace: RwLock<HashSet<ComponentWithClassForNode>>,
+    staged_changes: RwLock<HashSet<StagedComponentChange>>,
     instances_by_component_class_godot: HashMap<StringName, Array<Gd<Component>>>,
     all_instances_internal: Vec<(Gd<NodeEntity>, Gd<Node>, Gd<Component>)>,
     pub(crate) all_instances: Dictionary,
@@ -40,27 +60,12 @@ impl GodotCompositionWorld {
     pub fn node_entity_created(node_entity: Gd<NodeEntity>);
 
     #[signal]
-    /// Emitted when a component is added to a node
-    pub fn component_added(
+    /// Emitted when a component of a node is changed
+    pub fn component_changed(
         node_entity: Gd<NodeEntity>,
         component_class: StringName,
-        component: Gd<Component>,
-    );
-
-    #[signal]
-    /// Emitted when a component is removed from a node
-    pub fn component_removed(
-        node_entity: Gd<NodeEntity>,
-        component_class: StringName,
-        component: Gd<Component>,
-    );
-
-    #[signal]
-    /// Emitted when a component is replaced in a node
-    pub fn component_replaced(
-        node_entity: Gd<NodeEntity>,
-        component_class: StringName,
-        component: Gd<Component>,
+        component: Option<Gd<Component>>,
+        old_component: Option<Gd<Component>>,
     );
 
     #[func]
@@ -151,6 +156,7 @@ impl GodotCompositionWorld {
     pub fn set_entities_from_scene(&mut self, new_scene: Gd<Node>) {
         if new_scene.has_meta(NODE_ENTITIES_META_NAME) {
             self.remove_all_entities_and_pending_changes();
+            #[allow(clippy::mutable_key_type)]
             let mut node_entities = HashSet::<Gd<NodeEntity>>::new();
             let mut component_classes = HashSet::<StringName>::new();
             let entity_paths = new_scene
@@ -186,162 +192,32 @@ impl GodotCompositionWorld {
     }
 
     #[func]
-    /// Adds a component to a node
-    pub fn add_component_to_node(
+    /// Sets the component of a node
+    ///
+    /// Passing null for "component" removes it, if present
+    pub fn set_component_of_node(
         &mut self,
-        component: Gd<Component>,
         node: Gd<Node>,
         component_class: StringName,
+        component: Option<Gd<Component>>,
     ) -> bool {
-        if self
-            .get_or_create_node_entity(node.clone())
-            .bind()
-            .has_component_of_class(component_class.clone())
-        {
+        #[allow(clippy::mutable_key_type)]
+        let to_change = self.staged_changes.get_mut().unwrap_or_else(|err| {
             godot_warn!(
-                "Component {} already exists for {}",
-                component_class,
-                node.get_name()
-            );
-            false
-        } else {
-            let to_add = self.to_add.get_mut().unwrap_or_else(|err| {
-                godot_warn!(
-                        "The lock for the to_add queue was poisoned. A component might not have been added"
-                    );
-                err.into_inner()
-            });
-
-            let component_with_class =
-                ComponentWithClass::create(component_class.clone(), component);
-            let to_add_data = ComponentWithClassForNode {
-                node,
-                component_with_class,
-            };
-
-            if to_add.contains(&to_add_data) {
-                godot_warn!(
-                    "Component {} is already being added to {}",
-                    to_add_data.component_with_class.component_class,
-                    to_add_data.node.get_name()
+                    "The lock for the staged_changes queue was poisoned. A requested component change might not have been applied"
                 );
-                self.to_add.clear_poison();
-                false
-            } else {
-                to_add.insert(to_add_data);
-                self.to_add.clear_poison();
-                true
-            }
-        }
-    }
-
-    #[func]
-    /// Removes the component from the node, if present
-    pub fn remove_component_from_node(
-        &mut self,
-        node: Gd<Node>,
-        component_class: StringName,
-    ) -> bool {
-        if let Some(node_entity) = self.node_entities.get(&node.instance_id()) {
-            if let Some(component) = node_entity
-                .bind()
-                .get_component_of_class_or_null(component_class.clone())
-            {
-                let component_with_class = ComponentWithClass::create(component_class, component);
-
-                let to_remove = self.to_remove.get_mut().unwrap_or_else(|err| {
-                    godot_warn!(
-                            "The lock for the to_remove queue was poisoned. A component might not have been removed"
-                        );
-                    err.into_inner()
-                });
-
-                let to_remove_data = ComponentWithClassForNode {
-                    node,
-                    component_with_class,
-                };
-                if to_remove.contains(&to_remove_data) {
-                    godot_warn!(
-                        "Component {} was already marked as to be removed for {}",
-                        to_remove_data.component_with_class.component_class,
-                        to_remove_data.node.get_name()
-                    );
-                    self.to_remove.clear_poison();
-                    false
-                } else {
-                    to_remove.insert(to_remove_data);
-                    self.to_remove.clear_poison();
-                    true
-                }
-            } else {
-                godot_warn!(
-                    "Node {} does not have component {}",
-                    node.get_name(),
-                    component_class
-                );
-                false
-            }
-        } else {
-            godot_warn!("Node {} does have any entities", node.get_name());
-            false
-        }
-    }
-
-    #[func]
-    /// Replaces an existing component of a node
-    pub fn replace_component_of_node(
-        &mut self,
-        component: Gd<Component>,
-        node: Gd<Node>,
-        component_class: StringName,
-    ) -> bool {
-        let entity = match self.node_entities.get(&node.instance_id()) {
-            None => {
-                godot_warn!("Node {} does not have an entity", node.get_name());
-                return false;
-            }
-            Some(entity) => entity,
-        };
-
-        if !entity
-            .bind()
-            .has_component_of_class(component_class.clone())
-        {
-            godot_warn!(
-                "Node {} does not have the component  {}",
-                node.get_name(),
-                component_class
-            );
-            return false;
-        }
-
-        let to_replace = self.to_replace.get_mut().unwrap_or_else(|err| {
-            godot_warn!(
-                            "The lock for the to_replace queue was poisoned. A component might not have been replaced"
-                        );
             err.into_inner()
         });
 
-        let component_with_class = ComponentWithClass::create(component_class, component);
-
-        let to_replace_data = ComponentWithClassForNode {
+        let to_change_data = StagedComponentChange {
             node,
-            component_with_class,
+            component_class,
+            component,
         };
 
-        if to_replace.contains(&to_replace_data) {
-            godot_warn!(
-                "Component {} was already marked as to be replaced for {}",
-                to_replace_data.component_with_class.component_class,
-                to_replace_data.node.get_name()
-            );
-            self.to_replace.clear_poison();
-            false
-        } else {
-            to_replace.insert(to_replace_data);
-            self.to_replace.clear_poison();
-            true
-        }
+        let was_change_added = to_change.insert(to_change_data);
+        self.staged_changes.clear_poison();
+        was_change_added
     }
 
     #[func]
@@ -379,7 +255,7 @@ impl GodotCompositionWorld {
 
     #[func]
     /// Returns all existing node entities
-    pub fn get_all_node_entity(&self) -> Vec<Gd<NodeEntity>> {
+    pub fn get_all_node_entities(&self) -> Vec<Gd<NodeEntity>> {
         self.node_entities.values().cloned().collect()
     }
 
@@ -388,6 +264,7 @@ impl GodotCompositionWorld {
     ///
     /// Note that components that have an active reference will remain accessible but won't have a node entity
     pub fn remove_all_entities_and_pending_changes(&mut self) {
+        #[allow(clippy::mutable_key_type)]
         let mut changed_nodes: HashSet<Gd<NodeEntity>> = HashSet::new();
         for node_entity in self.node_entities.values_mut() {
             for mut component in node_entity.bind_mut().components.clone() {
@@ -396,11 +273,7 @@ impl GodotCompositionWorld {
             changed_nodes.insert(node_entity.clone());
         }
         self.node_entities.clear();
-        self.to_add
-            .get_mut()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clear();
-        self.to_remove
+        self.staged_changes
             .get_mut()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .clear();
@@ -442,108 +315,47 @@ impl INode for GodotCompositionWorld {
 
 impl GodotCompositionWorld {
     fn process_changes(&mut self) {
+        #[allow(clippy::mutable_key_type)]
         let mut changed_nodes: HashSet<Gd<NodeEntity>> = HashSet::new();
         let mut changed_component_classes: HashSet<StringName> = HashSet::new();
-        let to_remove: Vec<ComponentWithClassForNode> = match self.to_remove.get_mut() {
-            Ok(to_remove) => to_remove.drain().collect(),
+
+        let to_change: Vec<StagedComponentChange> = match self.staged_changes.get_mut() {
+            Ok(to_change) => to_change.drain().collect(),
             Err(err) => {
                 godot_warn!(
-                    "The lock for the to_remove queue was poisoned. A component might not have been removed"
+                    "The lock for the staged_changes queue was poisoned. A requested component change might not have been applied"
                 );
                 err.into_inner().drain().collect()
             }
         };
 
-        self.to_remove.clear_poison();
+        self.staged_changes.clear_poison();
 
-        for component_with_class_for_node in to_remove {
-            if let Some(ref mut node_entity) =
-                self.get_node_entity_or_null(component_with_class_for_node.node.clone())
-            {
-                node_entity.bind_mut().remove_component(
-                    component_with_class_for_node
-                        .component_with_class
-                        .component_class
-                        .clone(),
-                );
-                self.signals().component_removed().emit(
-                    &node_entity.clone(),
-                    &component_with_class_for_node
-                        .component_with_class
-                        .component_class
-                        .clone(),
-                    &component_with_class_for_node.component_with_class.component,
-                );
-                changed_nodes.insert(node_entity.clone());
-            }
-            changed_component_classes.insert(
-                component_with_class_for_node
-                    .component_with_class
-                    .component_class
-                    .clone(),
-            );
-        }
-
-        let to_replace: Vec<ComponentWithClassForNode> = match self.to_replace.get_mut() {
-            Ok(to_replace) => to_replace.drain().collect(),
-            Err(err) => {
-                godot_warn!(
-                    "The lock for the to_replace queue was poisoned. A component might not have been replaced"
-                );
-                err.into_inner().drain().collect()
-            }
-        };
-
-        self.to_replace.clear_poison();
-
-        for component_with_class_for_node in to_replace {
-            let component_with_class = &component_with_class_for_node.component_with_class;
-            let component_class = component_with_class.component_class.clone();
-            let mut node_entity =
-                self.get_or_create_node_entity(component_with_class_for_node.node);
+        for staged_change in to_change {
+            let component = staged_change.component;
+            let component_class = staged_change.component_class;
+            let mut node_entity = self.get_or_create_node_entity(staged_change.node);
+            let old_component = node_entity
+                .bind()
+                .get_component_of_class_or_null(component_class.clone());
             node_entity
                 .bind_mut()
-                .replace_component(component_with_class.clone());
-            changed_component_classes.insert(component_class.clone());
-            self.signals().component_replaced().emit(
-                &node_entity.clone(),
-                &component_class.clone(),
-                &component_with_class_for_node.component_with_class.component,
-            );
-            changed_nodes.insert(node_entity.clone());
-        }
-
-        let to_add: Vec<ComponentWithClassForNode> = match self.to_add.get_mut() {
-            Ok(to_add) => to_add.drain().collect(),
-            Err(err) => {
-                godot_warn!(
-                    "The lock for the to_add queue was poisoned. A component might not have been added"
-                );
-                err.into_inner().drain().collect()
-            }
-        };
-
-        self.to_add.clear_poison();
-
-        for component_with_class_for_node in to_add {
-            let component_with_class = component_with_class_for_node.component_with_class;
-            let component_class = component_with_class.component_class.clone();
-            let mut node_entity =
-                self.get_or_create_node_entity(component_with_class_for_node.node);
-            node_entity
-                .bind_mut()
-                .add_component(component_with_class.clone());
+                .set_component(component_class.clone(), component.clone());
             changed_component_classes.insert(component_class.clone());
             changed_nodes.insert(node_entity.clone());
-            self.signals().component_added().emit(
+
+            self.signals().component_changed().emit(
                 &node_entity,
                 &component_class,
-                &component_with_class.component,
+                component.as_ref(),
+                old_component.as_ref(),
             );
         }
+
         self.update_caches(changed_nodes, changed_component_classes);
     }
 
+    #[allow(clippy::mutable_key_type)]
     pub fn update_caches(
         &mut self,
         changed_nodes: HashSet<Gd<NodeEntity>>,

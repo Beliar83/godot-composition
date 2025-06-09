@@ -48,6 +48,10 @@ public static class GDExtensionHelper
     /// </returns>
     public static T Bind<T>(GodotObject godotObject) where T : GodotObject
     {
+        if (godotObject is null)
+        {
+            return null;
+        }
 #if DEBUG
         if (!GodotObject.IsInstanceValid(godotObject))
         {

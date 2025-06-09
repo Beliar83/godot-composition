@@ -1,0 +1,14 @@
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.4
+reloadable = true
+
+[libraries]
+linux.debug.x86_64 =     "res://../target/debug/libgodot_composition_tests.so"
+linux.release.x86_64 =   "res://../target/release/libgodot_composition_tests.so"
+windows.debug.x86_64 =   "res://../target/debug/godot_composition_tests.dll"
+windows.release.x86_64 = "res://../target/release/godot_composition_tests.dll"
+macos.debug =            "res://../target/debug/libgodot_composition_tests.dylib"
+macos.release =          "res://../target/release/libgodot_composition_tests.dylib"
+macos.debug.arm64 =      "res://../target/debug/libgodot_composition_tests.dylib"
+macos.release.arm64 =    "res://../target/release/libgodot_composition_tests.dylib"

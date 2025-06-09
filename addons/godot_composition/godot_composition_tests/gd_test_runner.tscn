@@ -1,0 +1,4 @@
+[gd_scene format=3 uid="uid://brb7gcyh88mwi"]
+
+[node name="GdTestRunner" type="GdTestRunner"]
+metadata/godot_composition_node_entities = Array[NodePath]([])

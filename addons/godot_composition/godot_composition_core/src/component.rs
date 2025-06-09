@@ -13,11 +13,7 @@ pub struct Component {
 impl Component {
     #[func(virtual)]
     /// Called when the entity if the component is changed
-    pub fn entity_changed(
-        &mut self,
-        _node_entity: Option<Gd<NodeEntity>>,
-    ) {
-    }
+    pub fn entity_changed(&mut self, _node_entity: Option<Gd<NodeEntity>>) {}
     #[func(virtual)]
     /// Called during _process of the normal engine loop
     pub fn process(&mut self, _delta: f64, _node: Gd<Node>, _node_entity: Gd<NodeEntity>) {}

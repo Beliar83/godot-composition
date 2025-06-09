@@ -54,109 +54,42 @@ public partial class NodeEntity : RefCounted
 
     #region Signals
 
-    private void componentRemovedCall(StringName componentClass)
+    private void componentChangedCall(NodeEntity nodeEntity, StringName componentClass, Component component,
+        Component oldComponent)
     {
-        StringName arg0 = componentClass;
-        _componentRemoved_backing?.Invoke(arg0);
+        NodeEntity arg0 = GDExtensionHelper.Bind<NodeEntity>(nodeEntity);
+        StringName arg1 = componentClass;
+        Component arg2 = GDExtensionHelper.Bind<Component>(component);
+        Component arg3 = GDExtensionHelper.Bind<Component>(oldComponent);
+        _componentChanged_backing?.Invoke(arg0, arg1, arg2, arg3);
     }
 
-    public delegate void ComponentRemovedHandler(StringName componentClass);
+    public delegate void ComponentChangedHandler(NodeEntity nodeEntity, StringName componentClass, Component component,
+        Component oldComponent);
 
-    private ComponentRemovedHandler _componentRemoved_backing;
-    private Callable _componentRemoved_backing_callable;
+    private ComponentChangedHandler _componentChanged_backing;
+    private Callable _componentChanged_backing_callable;
 
-    public event ComponentRemovedHandler ComponentRemoved
+    public event ComponentChangedHandler ComponentChanged
     {
         add
         {
-            if (_componentRemoved_backing == null)
+            if (_componentChanged_backing == null)
             {
-                _componentRemoved_backing_callable = new Callable(this, MethodName.componentRemovedCall);
-                Connect(_cached_component_removed, _componentRemoved_backing_callable);
+                _componentChanged_backing_callable = new Callable(this, MethodName.componentChangedCall);
+                Connect(_cached_component_changed, _componentChanged_backing_callable);
             }
 
-            _componentRemoved_backing += value;
+            _componentChanged_backing += value;
         }
         remove
         {
-            _componentRemoved_backing -= value;
+            _componentChanged_backing -= value;
 
-            if (_componentRemoved_backing == null)
+            if (_componentChanged_backing == null)
             {
-                Disconnect(_cached_component_removed, _componentRemoved_backing_callable);
-                _componentRemoved_backing_callable = default;
-            }
-        }
-    }
-
-    private void componentAddedCall(StringName componentClass, Component component)
-    {
-        StringName arg0 = componentClass;
-        Component arg1 = GDExtensionHelper.Bind<Component>(component);
-        _componentAdded_backing?.Invoke(arg0, arg1);
-    }
-
-    public delegate void ComponentAddedHandler(StringName componentClass, Component component);
-
-    private ComponentAddedHandler _componentAdded_backing;
-    private Callable _componentAdded_backing_callable;
-
-    public event ComponentAddedHandler ComponentAdded
-    {
-        add
-        {
-            if (_componentAdded_backing == null)
-            {
-                _componentAdded_backing_callable = new Callable(this, MethodName.componentAddedCall);
-                Connect(_cached_component_added, _componentAdded_backing_callable);
-            }
-
-            _componentAdded_backing += value;
-        }
-        remove
-        {
-            _componentAdded_backing -= value;
-
-            if (_componentAdded_backing == null)
-            {
-                Disconnect(_cached_component_added, _componentAdded_backing_callable);
-                _componentAdded_backing_callable = default;
-            }
-        }
-    }
-
-    private void componentReplacedCall(StringName componentClass, Component component)
-    {
-        StringName arg0 = componentClass;
-        Component arg1 = GDExtensionHelper.Bind<Component>(component);
-        _componentReplaced_backing?.Invoke(arg0, arg1);
-    }
-
-    public delegate void ComponentReplacedHandler(StringName componentClass, Component component);
-
-    private ComponentReplacedHandler _componentReplaced_backing;
-    private Callable _componentReplaced_backing_callable;
-
-    public event ComponentReplacedHandler ComponentReplaced
-    {
-        add
-        {
-            if (_componentReplaced_backing == null)
-            {
-                _componentReplaced_backing_callable = new Callable(this, MethodName.componentReplacedCall);
-                Connect(_cached_component_replaced, _componentReplaced_backing_callable);
-            }
-
-            _componentReplaced_backing += value;
-        }
-        remove
-        {
-            _componentReplaced_backing -= value;
-
-            if (_componentReplaced_backing == null)
-            {
-                Disconnect(_cached_component_replaced, _componentReplaced_backing_callable);
-                _componentReplaced_backing_callable = default;
+                Disconnect(_cached_component_changed, _componentChanged_backing_callable);
+                _componentChanged_backing_callable = default;
             }
         }
     }
@@ -216,7 +149,5 @@ public partial class NodeEntity : RefCounted
     private static readonly StringName _cached_get_component_of_class_or_null = "get_component_of_class_or_null";
     private static readonly StringName _cached_get_node = "get_node";
     private static readonly StringName _cached_set_node = "set_node";
-    private static readonly StringName _cached_component_removed = "component_removed";
-    private static readonly StringName _cached_component_added = "component_added";
-    private static readonly StringName _cached_component_replaced = "component_replaced";
+    private static readonly StringName _cached_component_changed = "component_changed";
 }

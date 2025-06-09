@@ -15,9 +15,7 @@ public partial class NodeEntity
         "Wrapper classes cannot be constructed with Ctor (it only instantiate the underlying RefCounted), please use the Instantiate() method instead.")]
     protected NodeEntity()
     {
-        ComponentAdded += OnComponentAdded;
-        ComponentRemoved += OnComponentRemoved;
-        ComponentReplaced += OnComponentReplaced;
+        ComponentChanged += OnComponentChanged;
     }
 
     /// <inheritdoc />
@@ -25,9 +23,7 @@ public partial class NodeEntity
     {
         try
         {
-            ComponentAdded -= OnComponentAdded;
-            ComponentRemoved -= OnComponentRemoved;
-            ComponentReplaced -= OnComponentReplaced;
+            ComponentChanged -= OnComponentChanged;
         }
         catch (ObjectDisposedException)
         { }
@@ -42,30 +38,11 @@ public partial class NodeEntity
         { }
     }
 
-    /// <summary>
-    ///     Emitted when a component was added to this Entity
-    /// </summary>
-    private void OnComponentAdded(StringName componentClass, Component component)
+    private void OnComponentChanged(NodeEntity nodeEntity, StringName componentClass, Component oldComponent,
+        Component component)
     {
         components[componentClass] = component;
     }
-
-    /// <summary>
-    ///     Emitted when a component was removed from this Entity
-    /// </summary>
-    private void OnComponentRemoved(StringName componentClass)
-    {
-        components.Remove(componentClass);
-    }
-
-    /// <summary>
-    ///     /// Emitted when a component was replaced on this Entity
-    /// </summary>
-    private void OnComponentReplaced(StringName componentClass, Component component)
-    {
-        components[componentClass] = component;
-    }
-
 
     /// <summary>
     ///     Returns whether this Entity has a component of the given class

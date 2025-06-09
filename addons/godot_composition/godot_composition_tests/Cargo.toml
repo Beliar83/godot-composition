@@ -1,0 +1,13 @@
+[package]
+name = "godot-composition-tests"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]  # Compile this crate to a dynamic C library.
+
+[dependencies]
+godot = { workspace = true }
+godot-composition-core = { path = "../godot_composition_core"}
+gd-rehearse = { git = "https://github.com/Beliar83/gd-rehearse", branch = "gdext_0.3" }
+#gd-rehearse = { git = "https://github.com/StatisMike/gd-rehearse" }

@@ -158,10 +158,10 @@ impl GodotCompositionEditorPlugin {
                     .bind()
                     .node_has_component_of_class(node.clone(), component.component_class.clone())
                 {
-                    world.bind_mut().add_component_to_node(
-                        component.component.clone(),
+                    world.bind_mut().set_component_of_node(
                         node.clone(),
                         component.component_class.clone(),
+                        Some(component.component.clone()),
                     );
                 }
             }
@@ -197,10 +197,10 @@ impl GodotCompositionEditorPlugin {
             dialog.clone().signals().confirmed().connect(move || {
                 let mut world = GodotCompositionWorld::get_singleton();
                 for component in &components {
-                    world.bind_mut().replace_component_of_node(
-                        component.component.clone(),
+                    world.bind_mut().set_component_of_node(
                         node.clone(),
                         component.component_class.clone(),
+                        Some(component.component.clone()),
                     );
                 }
                 dialog_confirmed.queue_free();
@@ -250,23 +250,15 @@ impl IEditorPlugin for GodotCompositionEditorPlugin {
         let world = GodotCompositionWorld::get_singleton();
         world
             .signals()
-            .component_added()
-            .connect(|_, _, _| EditorInterface::singleton().mark_scene_as_unsaved());
-        world
-            .signals()
-            .component_removed()
-            .connect(|_, _, _| EditorInterface::singleton().mark_scene_as_unsaved());
-        world
-            .signals()
-            .component_replaced()
-            .connect(|_, _, _| EditorInterface::singleton().mark_scene_as_unsaved());
+            .component_changed()
+            .connect(|_, _, _, _| EditorInterface::singleton().mark_scene_as_unsaved());
+
         let self_gd = self.to_gd();
         Engine::singleton().register_singleton(
             &GodotCompositionEditorPlugin::class_name().to_string_name(),
             &self_gd,
         );
 
-        let self_gd = self.to_gd();
         // Can't use signals(), as that does not support receiving null values yet
         self.base_mut().connect(
             "scene_changed",
