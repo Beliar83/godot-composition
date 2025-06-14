@@ -1,9 +1,11 @@
 use crate::tests::test_object::TestObject;
 use gd_rehearse::itest::gditest;
 use godot::classes::object::ConnectFlags;
+use godot::classes::{ResourceLoader, Script};
 use godot::prelude::*;
 use godot_composition_core::component::Component;
 use godot_composition_core::godot_composition_world::GodotCompositionWorld;
+use godot_composition_core::node_entity::NodeEntity;
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -65,7 +67,7 @@ fn get_or_create_node_entity_should_emit_a_signal_when_a_new_node_entity_is_crea
             .node_entity_created()
             .builder()
             .flags(ConnectFlags::ONE_SHOT)
-            .connect(move |node_entity| {
+            .connect(move |node_entity: Gd<NodeEntity>| {
                 assert_eq!(node_entity.bind().node.clone().unwrap(), node);
             });
     }
@@ -262,7 +264,10 @@ fn set_component_emits_signal_when_a_new_component_is_added() {
             .builder()
             .flags(ConnectFlags::ONE_SHOT)
             .connect(
-                move |node_entity, p_component_class, p_component, old_component| {
+                move |node_entity: Gd<NodeEntity>,
+                      p_component_class: StringName,
+                      p_component: Option<Gd<Component>>,
+                      old_component: Option<Gd<Component>>| {
                     called.replace(true);
                     let mut instance = GodotCompositionWorld::get_singleton();
                     let entity = instance.bind_mut().get_or_create_node_entity(node.clone());
@@ -313,7 +318,10 @@ fn set_component_emits_signal_when_a_component_is_removed() {
             .builder()
             .flags(ConnectFlags::ONE_SHOT)
             .connect(
-                move |node_entity, p_component_class, p_component, old_component| {
+                move |node_entity: Gd<NodeEntity>,
+                      p_component_class: StringName,
+                      p_component: Option<Gd<Component>>,
+                      old_component: Option<Gd<Component>>| {
                     called.replace(true);
                     let mut instance = GodotCompositionWorld::get_singleton();
                     let entity = instance.bind_mut().get_or_create_node_entity(node.clone());
@@ -364,7 +372,10 @@ fn set_component_emits_signal_when_a_component_is_replaced() {
             .builder()
             .flags(ConnectFlags::ONE_SHOT)
             .connect(
-                move |node_entity, p_component_class, p_component, old_component| {
+                move |node_entity: Gd<NodeEntity>,
+                      p_component_class: StringName,
+                      p_component: Option<Gd<Component>>,
+                      old_component: Option<Gd<Component>>| {
                     called.replace(true);
                     assert_eq!(node_entity, entity);
                     assert_eq!(p_component_class, component_class);
@@ -391,6 +402,150 @@ fn set_component_emits_signal_when_a_component_is_replaced() {
 }
 
 #[gditest]
+fn calling_update_should_update_all_instances() {
+    let mut instance = GodotCompositionWorld::get_singleton();
+
+    let component = Component::new_gd();
+    let mut nodes = Vec::new();
+    let node = Node::new_alloc();
+    nodes.push(node.clone());
+    let component_class = StringName::from("test");
+    let mut entity = instance.bind_mut().get_or_create_node_entity(node.clone());
+    entity
+        .bind_mut()
+        .set_component(component_class.clone(), Some(component.clone()));
+    instance.bind_mut().update_caches(
+        HashSet::from([entity]),
+        HashSet::from([component_class.clone()]),
+    );
+
+    let components: Vec<_> = extract_components(&mut instance);
+    assert_eq!(components.len(), 1);
+
+    let node = Node::new_alloc();
+    nodes.push(node.clone());
+    let mut entity = instance.bind_mut().get_or_create_node_entity(node.clone());
+    entity
+        .bind_mut()
+        .set_component(component_class.clone(), Some(component.clone()));
+    instance.bind_mut().update_caches(
+        HashSet::from([entity.clone()]),
+        HashSet::from([component_class.clone()]),
+    );
+
+    let components: Vec<_> = extract_components(&mut instance);
+    assert_eq!(components.len(), 2);
+
+    entity
+        .bind_mut()
+        .set_component(component_class.clone(), None);
+    godot_print!(
+        "{}",
+        entity
+            .bind()
+            .has_component_of_class(component_class.clone())
+    );
+    instance.bind_mut().update_caches(
+        HashSet::from([entity]),
+        HashSet::from([component_class.clone()]),
+    );
+
+    let components: Vec<_> = extract_components(&mut instance);
+    assert_eq!(components.len(), 1);
+
+    for node in nodes {
+        node.free();
+    }
+    instance
+        .bind_mut()
+        .remove_all_entities_and_pending_changes();
+}
+
+fn extract_components(instance: &mut Gd<GodotCompositionWorld>) -> Vec<Dictionary> {
+    instance
+        .bind_mut()
+        .get_all_components()
+        .iter_shared()
+        .typed::<Gd<Node>, Vec<Dictionary>>()
+        .flat_map(|x| x.1)
+        .collect()
+}
+
+#[gditest]
+fn process_calls_process_on_components() {
+    let script = ResourceLoader::singleton()
+        .load("uid://2jgn8yhev0bx")
+        .unwrap()
+        .cast::<Script>();
+    let mut instance = GodotCompositionWorld::get_singleton();
+    let mut second_component = Component::new_gd();
+    second_component.set_script(&script.to_variant());
+    let mut first_component = Component::new_gd();
+    first_component.set_script(&script.to_variant());
+
+    let node = Node::new_alloc();
+    let first_component_class = StringName::from("test1");
+    let second_component_class = StringName::from("test2");
+    let mut entity = instance.bind_mut().get_or_create_node_entity(node.clone());
+    entity
+        .bind_mut()
+        .set_component(first_component_class.clone(), Some(first_component.clone()));
+    entity.bind_mut().set_component(
+        second_component_class.clone(),
+        Some(second_component.clone()),
+    );
+    instance.bind_mut().update_caches(
+        HashSet::from([entity]),
+        HashSet::from([first_component_class.clone()]),
+    );
+    instance.bind_mut().process(0f64);
+    assert_eq!(first_component.get("process_calls").to::<i64>(), 1);
+    assert_eq!(second_component.get("process_calls").to::<i64>(), 1);
+
+    node.free();
+    instance
+        .bind_mut()
+        .remove_all_entities_and_pending_changes();
+}
+
+#[gditest]
+fn physics_process_calls_physics_process_on_components() {
+    let script = ResourceLoader::singleton()
+        .load("uid://2jgn8yhev0bx")
+        .unwrap()
+        .cast::<Script>();
+    let mut instance = GodotCompositionWorld::get_singleton();
+    let mut second_component = Component::new_gd();
+    second_component.set_script(&script.to_variant());
+    let mut first_component = Component::new_gd();
+    first_component.set_script(&script.to_variant());
+
+    let node = Node::new_alloc();
+    let first_component_class = StringName::from("test1");
+    let second_component_class = StringName::from("test2");
+    let mut entity = instance.bind_mut().get_or_create_node_entity(node.clone());
+    entity
+        .bind_mut()
+        .set_component(first_component_class.clone(), Some(first_component.clone()));
+    entity.bind_mut().set_component(
+        second_component_class.clone(),
+        Some(second_component.clone()),
+    );
+    instance.bind_mut().update_caches(
+        HashSet::from([entity]),
+        HashSet::from([first_component_class.clone()]),
+    );
+    instance.bind_mut().physics_process(0f64);
+    assert_eq!(first_component.get("physics_process_calls").to::<i64>(), 1);
+    assert_eq!(second_component.get("physics_process_calls").to::<i64>(), 1);
+
+    node.free();
+    instance
+        .bind_mut()
+        .remove_all_entities_and_pending_changes();
+}
+
+#[gditest]
 fn do_for_all_components_calls_the_callable() {
     let mut instance = GodotCompositionWorld::get_singleton();
     let component = Component::new_gd();
@@ -414,11 +569,10 @@ fn do_for_all_components_calls_the_callable() {
     let callable = callable.bind(&[component_class.to_variant(), component.to_variant()]);
 
     instance.bind_mut().do_for_all_components(callable);
-    assert!(
-        test_instance
-            .get_meta("check_do_for_all_components_calls_the_callable")
-            .booleanize()
-    );
+    let was_called = test_instance
+        .get_meta("check_do_for_all_components_calls_the_callable")
+        .booleanize();
+    assert!(was_called);
 
     node.free();
     instance
@@ -465,12 +619,113 @@ fn do_for_all_components_calls_the_callable_for_each_component() {
     );
 
     instance.bind_mut().do_for_all_components(callable);
-    assert_eq!(
-        test_instance
-            .get_meta("check_do_for_all_components_calls_the_callable_for_each_component_calls")
-            .to::<i64>(),
-        ENTITY_COUNT * classes.len() as i64
+    let call_count = test_instance
+        .get_meta("check_do_for_all_components_calls_the_callable_for_each_component_calls")
+        .to::<i64>();
+    let expected_calls = ENTITY_COUNT * classes.len() as i64;
+    assert_eq!(call_count, expected_calls);
+    for node in nodes {
+        node.free();
+    }
+    instance
+        .bind_mut()
+        .remove_all_entities_and_pending_changes();
+}
+
+#[gditest]
+fn do_for_all_components_of_class_calls_the_callable() {
+    let mut instance = GodotCompositionWorld::get_singleton();
+    let component = Component::new_gd();
+
+    let node = Node::new_alloc();
+    let class_to_use = StringName::from("test999");
+    let other_class = StringName::from("test");
+    let mut entity = instance.bind_mut().get_or_create_node_entity(node.clone());
+    entity
+        .bind_mut()
+        .set_component(class_to_use.clone(), Some(component.clone()));
+    entity
+        .bind_mut()
+        .set_component(other_class.clone(), Some(component.clone()));
+    instance.bind_mut().update_caches(
+        HashSet::from([entity]),
+        HashSet::from([class_to_use.clone(), other_class.clone()]),
     );
+
+    let test_instance = TestObject::new_gd();
+    let callable = Callable::from_object_method(
+        &test_instance,
+        &StringName::from("check_do_for_all_components_of_class_calls_the_callable"),
+    );
+    let callable = callable.bind(&[component.to_variant()]);
+
+    instance
+        .bind_mut()
+        .do_for_all_components_of_class(class_to_use, callable);
+    let was_called = test_instance
+        .get_meta("check_do_for_all_components_of_class_calls_the_callable")
+        .booleanize();
+    assert!(was_called);
+
+    node.free();
+    instance
+        .bind_mut()
+        .remove_all_entities_and_pending_changes();
+}
+
+#[gditest]
+fn do_for_all_components_of_class_calls_the_callable_for_each_component_of_the_given_class() {
+    let mut instance = GodotCompositionWorld::get_singleton();
+
+    let class_to_use = StringName::from("test999");
+
+    let classes = [
+        StringName::from("test"),
+        StringName::from("test2"),
+        StringName::from("test3"),
+        class_to_use.clone(),
+    ];
+    static ENTITY_COUNT: i64 = 3;
+
+    let mut entities = Vec::with_capacity(ENTITY_COUNT as usize);
+    let mut nodes = Vec::with_capacity(ENTITY_COUNT as usize);
+
+    for _ in 0..ENTITY_COUNT {
+        let node = Node::new_alloc();
+        let mut entity = instance.bind_mut().get_or_create_node_entity(node.clone());
+        let component = Component::new_gd();
+        for class in classes.iter() {
+            entity
+                .bind_mut()
+                .set_component(class.clone(), Some(component.clone()));
+        }
+        entities.push(entity);
+        nodes.push(node);
+    }
+
+    instance.bind_mut().update_caches(
+        entities.clone().into_iter().collect(),
+        HashSet::from(classes.clone()),
+    );
+
+    let test_instance = TestObject::new_gd();
+    let callable = Callable::from_object_method(
+        &test_instance,
+        &StringName::from(
+            "check_do_for_all_components_of_class_calls_the_callable_for_each_component_of_the_given_class",
+        ),
+    );
+
+    instance
+        .bind_mut()
+        .do_for_all_components_of_class(class_to_use, callable);
+    let recorded_calls = test_instance
+        .get_meta(
+            "check_do_for_all_components_of_class_calls_the_callable_for_each_component_calls",
+        )
+        .to::<i64>();
+    let expected_calls = entities.len() as i64;
+    assert_eq!(recorded_calls, expected_calls);
     for node in nodes {
         node.free();
     }

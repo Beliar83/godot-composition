@@ -362,7 +362,6 @@ impl GodotCompositionWorld {
         changed_component_classes: HashSet<StringName>,
     ) {
         if !changed_nodes.is_empty() {
-            self.all_instances.clear();
             self.all_instances_internal.retain(|(_, _, x)| {
                 changed_nodes.contains(&x.bind().get_node_entity().unwrap_or_default())
             });
@@ -370,8 +369,12 @@ impl GodotCompositionWorld {
                 HashMap::new();
 
             //NOTE: Possible performance improvement by also doing a complete update when a majority (exact percentage to be determined when doing this) has changed
-            let update_all_components = changed_component_classes.len() == self.node_entities.len();
+            let update_all_components = changed_component_classes.len() == self.instances_by_component_class.keys().len();
             let update_all_nodes = changed_nodes.len() == self.node_entities.len();
+
+            if update_all_nodes {
+                self.all_instances.clear();
+            }
 
             for node_entity in self.node_entities.values() {
                 let node = node_entity

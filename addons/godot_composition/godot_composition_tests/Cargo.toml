@@ -9,5 +9,6 @@ crate-type = ["cdylib"]  # Compile this crate to a dynamic C library.
 [dependencies]
 godot = { workspace = true }
 godot-composition-core = { path = "../godot_composition_core"}
+godot-rust-script = { git  = "https://github.com/TitanNano/godot-rust-script.git", branch = "master" }
 gd-rehearse = { git = "https://github.com/Beliar83/gd-rehearse", branch = "gdext_0.3" }
 #gd-rehearse = { git = "https://github.com/StatisMike/gd-rehearse" }
