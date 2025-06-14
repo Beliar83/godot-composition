@@ -45,4 +45,36 @@ impl TestObject {
             &Variant::from(calls + 1),
         );
     }
+
+    #[func]
+    fn check_do_for_all_components_of_class_calls_the_callable(
+        &mut self,
+        expected_component: Gd<Component>,
+        component: Gd<Component>,
+    ) {
+        self.base_mut().set_meta(
+            "check_do_for_all_components_of_class_calls_the_callable",
+            &Variant::from(true),
+        );
+        assert_eq!(component, expected_component);
+    }
+
+    #[func]
+    fn check_do_for_all_components_of_class_calls_the_callable_for_each_component_of_the_given_class(
+        &mut self,
+        _component: Gd<Component>,
+    ) {
+        let calls = self
+            .base()
+            .get_meta_ex(
+                "check_do_for_all_components_of_class_calls_the_callable_for_each_component_calls",
+            )
+            .default(&Variant::from(0))
+            .done()
+            .to::<i64>();
+        self.base_mut().set_meta(
+            "check_do_for_all_components_of_class_calls_the_callable_for_each_component_calls",
+            &Variant::from(calls + 1),
+        );
+    }
 }

@@ -1,6 +1,7 @@
 use gd_rehearse::itest::gditest;
 use godot::builtin::StringName;
 use godot::obj::{NewGd, WithUserSignals};
+use godot::prelude::*;
 use godot_composition_core::component::Component;
 use godot_composition_core::node_entity::NodeEntity;
 use std::cell::RefCell;
@@ -71,7 +72,10 @@ fn set_component_emits_signal_when_a_new_component_is_added() {
         let entity_copy = entity.clone();
         let called = called.clone();
         entity.bind_mut().signals().component_changed().connect(
-            move |p_entity, p_component_class, p_component, old_component| {
+            move |p_entity: Gd<NodeEntity>,
+                  p_component_class: StringName,
+                  p_component: Option<Gd<Component>>,
+                  old_component: Option<Gd<Component>>| {
                 called.replace(true);
                 assert_eq!(p_entity, entity_copy);
                 assert_eq!(p_component_class, component_class);
@@ -103,7 +107,10 @@ fn set_component_emits_signal_when_a_component_is_removed() {
         let entity_copy = entity.clone();
         let called = called.clone();
         entity.bind_mut().signals().component_changed().connect(
-            move |p_entity, p_component_class, p_component, old_component| {
+            move |p_entity: Gd<NodeEntity>,
+                  p_component_class: StringName,
+                  p_component: Option<Gd<Component>>,
+                  old_component: Option<Gd<Component>>| {
                 called.replace(true);
                 assert_eq!(p_entity, entity_copy);
                 assert_eq!(p_component_class, component_class);
@@ -139,7 +146,10 @@ fn set_component_emits_signal_when_a_component_is_replaced() {
         let entity_copy = entity.clone();
         let called = called.clone();
         entity.bind_mut().signals().component_changed().connect(
-            move |p_entity, p_component_class, p_component, old_component| {
+            move |p_entity: Gd<NodeEntity>,
+                  p_component_class: StringName,
+                  p_component: Option<Gd<Component>>,
+                  old_component: Option<Gd<Component>>| {
                 called.replace(true);
                 assert_eq!(p_entity, entity_copy);
                 assert_eq!(p_component_class, component_class);
