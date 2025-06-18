@@ -28,6 +28,11 @@ impl Component {
     }
     pub fn set_node_entity(&mut self, node_entity: Option<Gd<NodeEntity>>) {
         self.node_entity = node_entity.clone();
-        self.entity_changed(node_entity);
+        let mut self_gd = self.to_gd();
+        Callable::from_local_fn("emit_entity_change", move |_| {
+            self_gd.bind_mut().entity_changed(node_entity.clone());
+            Ok(Variant::nil())
+        })
+        .call_deferred(&[]);
     }
 }
