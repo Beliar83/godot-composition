@@ -3,7 +3,7 @@ use godot::global::{PropertyHint, PropertyUsageFlags};
 use godot::meta::{ClassName, PropertyHintInfo, PropertyInfo};
 use godot::obj::{EngineBitfield, EngineEnum};
 
-pub(crate) fn create_property_from_dictionary(property: Dictionary) -> PropertyInfo {
+pub fn create_property_from_dictionary(property: Dictionary) -> PropertyInfo {
     let name = property
         .get("name")
         .expect("Property in property list has no name")

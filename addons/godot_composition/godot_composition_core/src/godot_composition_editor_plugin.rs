@@ -9,6 +9,7 @@ use godot::classes::{
 };
 use godot::prelude::*;
 use std::collections::HashMap;
+use godot::classes::object::ConnectFlags;
 
 #[derive(GodotClass)]
 #[class(init, tool, base=EditorPlugin)]
@@ -226,14 +227,15 @@ impl IEditorPlugin for GodotCompositionEditorPlugin {
         match EditorInterface::singleton().get_edited_scene_root() {
             None => {}
             Some(scene) => {
-                let world = Engine::singleton()
+                let mut world = Engine::singleton()
                     .get_singleton(&GodotCompositionWorld::class_name().to_string_name())
                     .map(|world| world.cast::<GodotCompositionWorld>())
                     .expect("No GodotCompositionWorld singleton found");
                 world.bind().store_entities_to_scene(scene.clone());
 
-                Callable::from_object_method(&world, "clear_entities_from_scene")
-                    .call_deferred(&[scene.to_variant()]);
+                self.base().signals().scene_saved().builder().flags(ConnectFlags::ONE_SHOT).connect(move|_| {
+                    world.bind_mut().clear_entities_from_scene(scene.clone());
+                });
             }
         }
     }

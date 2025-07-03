@@ -140,9 +140,10 @@ impl GodotCompositionWorld {
                     .node
                     .clone()
                     .expect("Node entity has no node");
+                let components = node_entity.bind().get_all_components().to_variant();
                 node.set_meta(
                     COMPONENTS_META_NAME,
-                    &node_entity.bind().get_all_components().to_variant(),
+                    &components,
                 );
                 let node_path = scene.get_path_to(&node);
                 entities.push(&node_path);

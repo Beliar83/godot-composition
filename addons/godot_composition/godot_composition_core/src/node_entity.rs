@@ -144,3 +144,16 @@ impl NodeEntity {
         self.components.get(&key).map(|x| x.component.clone())
     }
 }
+
+#[godot_api]
+impl IRefCounted for NodeEntity {
+    fn get_property(&self, property: StringName) -> Option<Variant> {
+        let key = ComponentWithClass {
+            component_class: property,
+            component: Gd::default(),
+        };
+        self.components
+            .get(&key)
+            .map(|x| x.component.to_variant().clone())
+    }
+}
