@@ -1,14 +1,15 @@
 use crate::component::Component;
+use godot::classes::{ClassDb, ResourceLoader, Script};
 use godot::prelude::*;
 use std::hash::{Hash, Hasher};
 use std::sync::LazyLock;
 
 static COMPONENT_CLASS_NAME: &str = "component_class";
-static COMPONENT_NAME: &str = "component";
-static COMPONENT_CLASS_STRING_NAME: LazyLock<StringName> =
+pub static VALUES_NAME: &str = "values";
+pub static BASE_CLASS_NAME: &str = "base_class";
+pub static SCRIPT_NAME: &str = "script";
+pub static COMPONENT_CLASS_STRING_NAME: LazyLock<StringName> =
     LazyLock::new(|| StringName::from(COMPONENT_CLASS_NAME));
-static COMPONENT_STRING_NAME: LazyLock<StringName> =
-    LazyLock::new(|| StringName::from(COMPONENT_NAME));
 
 #[derive(Clone, Eq, Default)]
 pub struct ComponentWithClass {
@@ -51,8 +52,18 @@ impl ToGodot for ComponentWithClass {
             self.component_class.to_variant(),
         );
         dict.set(
-            COMPONENT_STRING_NAME.to_variant(),
-            self.component.to_variant(),
+            BASE_CLASS_NAME,
+            StringName::from(self.component.get_class()),
+        );
+        if !self.component.get_script().is_nil() {
+            dict.set(
+                SCRIPT_NAME,
+                self.component.get_script().to::<Gd<Script>>().get_path(),
+            );
+        }
+        dict.set(
+            VALUES_NAME.to_variant(),
+            self.component.clone().bind_mut().get_values(),
         );
         dict
     }
@@ -60,36 +71,43 @@ impl ToGodot for ComponentWithClass {
 
 impl FromGodot for ComponentWithClass {
     fn try_from_godot(via: Self::Via) -> Result<Self, ConvertError> {
-        let class_name_key = COMPONENT_CLASS_STRING_NAME.to_variant();
-        let component_key = COMPONENT_STRING_NAME.to_variant();
-        let keys_array = VariantArray::from(&[class_name_key.clone(), component_key.clone()]);
-        if via.contains_all_keys(&keys_array) {
-            let class_name = via
-                .get(class_name_key)
-                .expect("The engine said the key is present")
-                .try_to::<StringName>();
-            let component = via
-                .get(component_key)
-                .expect("The engine said the key is present")
-                .try_to::<Gd<Component>>();
-
-            match (class_name, component) {
-                (Ok(class_name), Ok(component)) => Ok(Self::create(class_name, component)),
-                (Ok(_), Err(component_error)) => Err(ConvertError::new(format!(
-                    "Invalid component: {}",
-                    component_error
-                ))),
-                (Err(class_name_error), Ok(_)) => Err(ConvertError::new(format!(
-                    "Invalid class_name: {}",
-                    class_name_error
-                ))),
-                (Err(class_name_error), Err(component_error)) => Err(ConvertError::new(format!(
-                    "Invalid class_name: {}, Invalid component: {}",
-                    class_name_error, component_error
-                ))),
+        let class_name = match via
+            .at(COMPONENT_CLASS_STRING_NAME.to_variant())
+            .try_to::<StringName>()
+        {
+            Ok(class_name) => class_name,
+            Err(error) => {
+                return Err(ConvertError::new(format!("Invalid class_name: {}", error)));
             }
-        } else {
-            Err(ConvertError::new("Dictionary does not contain all keys"))
+        };
+        let base_class = match via.at(BASE_CLASS_NAME.to_variant()).try_to::<StringName>() {
+            Ok(base_class) => base_class,
+            Err(error) => {
+                return Err(ConvertError::new(format!("Invalid base_class: {}", error)));
+            }
+        };
+
+        let mut component = ClassDb::singleton()
+            .instantiate(&base_class)
+            .to::<Gd<Component>>();
+        if via.contains_key(SCRIPT_NAME) {
+            let script_path = via.at(SCRIPT_NAME).to::<GString>();
+            match ResourceLoader::singleton().load(&script_path) {
+                None => {
+                    godot_print!("Could not load script: {}", script_path);
+                }
+                Some(script) => {
+                    component.set_script(&script.to_variant());
+                }
+            };
         }
+        let values = match via.at(VALUES_NAME.to_variant()).try_to::<Dictionary>() {
+            Ok(values) => values,
+            Err(error) => {
+                return Err(ConvertError::new(format!("values: {}", error)));
+            }
+        };
+        component.bind_mut().set_values(values);
+        Ok(Self::create(class_name, component))
     }
 }

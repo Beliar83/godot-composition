@@ -7,4 +7,4 @@ members = [
 ]
 
 [workspace.dependencies]
-godot = { version = "0.3.1", features = ["api-4-4", "register-docs", "experimental-threads"] }
+godot = { version = "0.3.2", features = ["api-4-4", "register-docs", "experimental-threads"] }

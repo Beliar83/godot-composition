@@ -5,12 +5,20 @@ use crate::property_info::create_property_from_dictionary;
 use godot::classes::box_container::AlignmentMode;
 use godot::classes::control::{LayoutPreset, SizeFlags};
 use godot::classes::{
-    Button, ClassDb, EditorInspector, EditorInterface, HBoxContainer, IPanelContainer, Label,
-    PanelContainer, PopupMenu, ResourceLoader, Script, VBoxContainer,
+    Button, ClassDb, EditorInspector, EditorInterface, HBoxContainer, Label,
+    PanelContainer, PopupMenu, ResourceLoader, VBoxContainer,
 };
 use godot::global::{HorizontalAlignment, PropertyUsageFlags};
 use godot::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::LazyLock;
+
+pub(crate) static PROPERTIES_TO_IGNORE: LazyLock<HashSet<StringName>> =
+    LazyLock::<HashSet<StringName>>::new(|| {
+        let mut property_names = HashSet::new();
+        property_names.insert(StringName::from("script"));
+        property_names
+    });
 
 enum ComponentType {
     Native(StringName),
@@ -38,7 +46,6 @@ impl ComponentsEditor {
             base,
         });
         instance.call_deferred("setup_ui", &[]);
-
         instance
     }
 }
@@ -103,11 +110,21 @@ impl ComponentsEditor {
 
     #[func]
     fn setup_ui(&mut self) {
+        for i in 0..self.base().get_child_count() {
+            let mut child = self
+                .base_mut()
+                .get_child(i)
+                .expect("Unexpected missing child");
+            child.queue_free();
+        }
+
         let mut world = GodotCompositionWorld::get_singleton();
         let node = self.node.clone().expect("Node was not set");
         let mut main_container = VBoxContainer::new_alloc();
         self.components.clear();
         let mut node_entity = world.bind_mut().get_or_create_node_entity(node.clone());
+
+        #[allow(clippy::mutable_key_type)]
         let components = &node_entity.bind_mut().components.clone();
         for component in components.iter() {
             let name = component.component_class.clone();
@@ -168,12 +185,15 @@ impl ComponentsEditor {
             remove_button.set_h_size_flags(SizeFlags::FILL);
             let mut node = node.clone();
             let mut world = world.clone();
-            remove_button.signals().pressed().connect(move || {
-                world
-                    .bind_mut()
-                    .set_component_of_node(node.clone(), name.clone(), None);
-                node.notify_property_list_changed();
-            });
+            {
+                let name = name.clone();
+                remove_button.signals().pressed().connect(move || {
+                    world
+                        .bind_mut()
+                        .set_component_of_node(node.clone(), name.clone(), None);
+                    node.notify_property_list_changed();
+                });
+            }
 
             header_layout.add_child(&remove_button);
 
@@ -182,11 +202,12 @@ impl ComponentsEditor {
 
             let mut property_editors = VBoxContainer::new_alloc();
 
-            for property in ClassDb::singleton()
-                .class_get_property_list(&StringName::from(component.get_class()))
-                .iter_shared()
-            {
+            for property in component.get_property_list().iter_shared() {
                 let property = create_property_from_dictionary(property);
+
+                if PROPERTIES_TO_IGNORE.contains(&property.property_name) {
+                    continue;
+                }
                 if property.usage.ord() & PropertyUsageFlags::EDITOR.ord()
                     == PropertyUsageFlags::EDITOR.ord()
                 {
@@ -213,51 +234,18 @@ impl ComponentsEditor {
                                     EditorInterface::singleton().mark_scene_as_unsaved();
                                 },
                             );
+                            editor.set_read_only(
+                                property.usage.ord() & PropertyUsageFlags::READ_ONLY.ord()
+                                    == PropertyUsageFlags::READ_ONLY.ord(),
+                            );
+
                             property_editors.add_child(&editor);
-                        }
-                    }
-                }
-            }
-            let script = component.get_script();
-            if !script.is_nil() {
-                let mut script = script.to::<Gd<Script>>();
-                for property in script.get_script_property_list().iter_shared() {
-                    let property = create_property_from_dictionary(property);
-                    if property.usage.ord() & PropertyUsageFlags::EDITOR.ord()
-                        == PropertyUsageFlags::EDITOR.ord()
-                    {
-                        match EditorInspector::instantiate_property_editor(
-                            &component.clone(),
-                            property.variant_type,
-                            &property.property_name.to_string(),
-                            property.hint_info.hint,
-                            &property.hint_info.hint_string,
-                            property.usage.ord() as u32,
-                        ) {
-                            None => {}
-                            Some(mut editor) => {
-                                editor.set_object_and_property(
-                                    &component.clone(),
-                                    &property.property_name,
-                                );
-                                editor.update_property();
-                                editor.set_label(&property.property_name.to_string());
-                                let mut component = component.clone();
-                                editor.signals().property_changed().connect(
-                                    move |path, value, _, _| {
-                                        component.set_deferred(&path, &value);
-                                        EditorInterface::singleton().mark_scene_as_unsaved();
-                                    },
-                                );
-                                property_editors.add_child(&editor);
-                            }
                         }
                     }
                 }
             }
 
             component_container.add_child(&property_editors);
-
             main_container.add_child(&component_container);
         }
 
@@ -395,9 +383,4 @@ impl ComponentsEditor {
             });
         };
     }
-}
-
-#[godot_api]
-impl IPanelContainer for ComponentsEditor {
-    fn ready(&mut self) {}
 }

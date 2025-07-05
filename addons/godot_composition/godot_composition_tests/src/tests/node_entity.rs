@@ -1,3 +1,4 @@
+use crate::tests::godot_composition_world::{INT_FIELD_KEY, STRING_FIELD_KEY};
 use gd_rehearse::itest::gditest;
 use godot::builtin::StringName;
 use godot::obj::{NewGd, WithUserSignals};
@@ -5,10 +6,11 @@ use godot::prelude::*;
 use godot_composition_core::component::Component;
 use godot_composition_core::node_entity::NodeEntity;
 use std::cell::RefCell;
+use std::ops::Deref;
 use std::rc::Rc;
 
 #[gditest]
-fn set_component_adds_a_non_existing_component() {
+fn set_component_should_add_a_non_existing_component() {
     let mut entity = NodeEntity::new_gd();
     let component = Component::new_gd();
     let component_class = StringName::from("Test");
@@ -21,7 +23,7 @@ fn set_component_adds_a_non_existing_component() {
 }
 
 #[gditest]
-fn set_component_removes_an_existing_component() {
+fn set_component_should_remove_an_existing_component() {
     let mut entity = NodeEntity::new_gd();
     let component = Component::new_gd();
     let component_class = StringName::from("Test");
@@ -37,7 +39,7 @@ fn set_component_removes_an_existing_component() {
 }
 
 #[gditest]
-fn set_component_replaces_an_existing_component() {
+fn set_component_should_replace_an_existing_component() {
     let mut entity = NodeEntity::new_gd();
     let existing_component = Component::new_gd();
     let component_class = StringName::from("Test");
@@ -60,7 +62,7 @@ fn set_component_replaces_an_existing_component() {
 }
 
 #[gditest]
-fn set_component_emits_signal_when_a_new_component_is_added() {
+fn set_component_should_emit_a_signal_when_a_new_component_is_added() {
     let mut entity = NodeEntity::new_gd();
     let component = Component::new_gd();
     let component_class = StringName::from("Test");
@@ -93,7 +95,7 @@ fn set_component_emits_signal_when_a_new_component_is_added() {
 }
 
 #[gditest]
-fn set_component_emits_signal_when_a_component_is_removed() {
+fn set_component_should_emit_signal_when_a_component_is_removed() {
     let mut entity = NodeEntity::new_gd();
     let component = Component::new_gd();
     let component_class = StringName::from("Test");
@@ -129,7 +131,7 @@ fn set_component_emits_signal_when_a_component_is_removed() {
 }
 
 #[gditest]
-fn set_component_emits_signal_when_a_component_is_replaced() {
+fn set_component_should_emit_a_signal_when_a_component_is_replaced() {
     let mut entity = NodeEntity::new_gd();
     let existing_component = Component::new_gd();
     let component_class = StringName::from("Test");
@@ -165,4 +167,92 @@ fn set_component_emits_signal_when_a_component_is_replaced() {
 
     let called = *called.borrow();
     assert!(called);
+}
+
+#[gditest]
+fn set_components_should_replace_all_components() {
+    let mut entity = NodeEntity::new_gd();
+
+    let old_component_name = StringName::from("Old component");
+    entity
+        .bind_mut()
+        .set_component(old_component_name.clone(), Some(Component::new_gd()));
+
+    let mut components = Vec::<Dictionary>::new();
+
+    let mut component_1_data = Dictionary::new();
+
+    component_1_data.set(
+        godot_composition_core::component_with_class::BASE_CLASS_NAME.to_variant(),
+        Component::class_name().to_string_name().to_variant(),
+    );
+
+    let component_1_values = Dictionary::new();
+    component_1_data.set(
+        godot_composition_core::component_with_class::VALUES_NAME.to_variant(),
+        component_1_values.to_variant(),
+    );
+
+    let component_1_name = StringName::from("another_component");
+    component_1_data.set(
+        godot_composition_core::component_with_class::COMPONENT_CLASS_STRING_NAME.to_variant(),
+        component_1_name.to_variant(),
+    );
+
+    components.push(component_1_data);
+
+    let mut component_2_data = Dictionary::new();
+
+    component_2_data.set(
+        godot_composition_core::component_with_class::BASE_CLASS_NAME.to_variant(),
+        Component::class_name().to_string_name().to_variant(),
+    );
+
+    let mut component_2_values = Dictionary::new();
+
+    component_2_values.set(INT_FIELD_KEY.to_variant(), 999.to_variant());
+    component_2_values.set(STRING_FIELD_KEY.to_variant(), "Zero Escape");
+    component_2_data.set(
+        godot_composition_core::component_with_class::SCRIPT_NAME.to_variant(),
+        "res://src/scripts/component_with_multiple_fields.rs".to_variant(),
+    );
+
+    component_2_data.set(
+        godot_composition_core::component_with_class::VALUES_NAME.to_variant(),
+        component_2_values.to_variant(),
+    );
+    let component_name = StringName::from("component_with_multiple_fields");
+    component_2_data.set(
+        godot_composition_core::component_with_class::COMPONENT_CLASS_STRING_NAME.to_variant(),
+        component_name.to_variant(),
+    );
+
+    components.push(component_2_data);
+
+    entity.bind_mut().set_components(components);
+
+    assert_eq!(entity.bind_mut().get_all_components().len(), 2);
+
+    assert_eq!(
+        entity
+            .bind_mut()
+            .get_component_of_class_or_null(old_component_name),
+        None
+    );
+
+    let component_1 = entity
+        .bind_mut()
+        .get_component_of_class_or_null(component_1_name)
+        .unwrap();
+    assert!(component_1.get_script().is_nil());
+    let component_2 = entity
+        .bind_mut()
+        .get_component_of_class_or_null(component_name)
+        .unwrap();
+    assert!(!component_2.get_script().is_nil());
+    assert_eq!(component_2.get(INT_FIELD_KEY.deref()), 999.to_variant());
+    assert_eq!(
+        component_2.get(STRING_FIELD_KEY.deref()),
+        "Zero Escape".to_variant()
+    );
 }

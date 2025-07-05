@@ -5,7 +5,7 @@ use godot_rust_script::{godot::prelude::Gd, godot_script_impl, GodotScript};
 
 #[derive(Debug, GodotScript)]
 #[script(base = Component)]
-pub(crate) struct TestComponent {
+pub(crate) struct ProcessTestComponent {
     #[export]
     pub process_calls: i64,
     #[export]
@@ -13,7 +13,7 @@ pub(crate) struct TestComponent {
 }
 
 #[godot_script_impl]
-impl TestComponent {
+impl ProcessTestComponent {
     pub fn _process(&mut self, _delta: f64, _node: Gd<Node>, _node_entity: Gd<NodeEntity>) {
         self.process_calls += 1;
     }

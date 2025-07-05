@@ -6,8 +6,8 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::RwLock;
 
-const COMPONENTS_META_NAME: &str = "godot_composition_components";
-const NODE_ENTITIES_META_NAME: &str = "godot_composition_node_entities";
+pub const COMPONENTS_META_NAME: &str = "godot_composition_components";
+pub const NODE_ENTITIES_META_NAME: &str = "godot_composition_node_entities";
 
 #[derive(Clone)]
 pub(crate) struct StagedComponentChange {
@@ -134,19 +134,19 @@ impl GodotCompositionWorld {
     pub fn store_entities_to_scene(&self, mut scene: Gd<Node>) {
         let mut entities = Array::new();
         for node_entity in self.node_entities.values() {
+            let mut node = node_entity
+                .bind()
+                .node
+                .clone()
+                .expect("Node entity has no node");
             if !node_entity.bind().components.is_empty() {
-                let mut node = node_entity
-                    .bind()
-                    .node
-                    .clone()
-                    .expect("Node entity has no node");
                 node.set_meta(
                     COMPONENTS_META_NAME,
                     &node_entity.bind().get_all_components().to_variant(),
                 );
-                let node_path = scene.get_path_to(&node);
-                entities.push(&node_path);
             }
+            let node_path = scene.get_path_to(&node);
+            entities.push(&node_path);
         }
         scene.set_meta(NODE_ENTITIES_META_NAME, &entities.to_variant());
     }
@@ -165,7 +165,7 @@ impl GodotCompositionWorld {
             for path in entity_paths {
                 let node = new_scene
                     .get_node_or_null(&path)
-                    .expect("Node for stored entity path not found");
+                    .unwrap_or_else(|| panic!("Node at path {} does not exist", path));
                 let mut node_entity = self.get_or_create_node_entity(node.clone());
                 let components = node.get_meta(COMPONENTS_META_NAME).to::<Vec<Dictionary>>();
                 component_classes.extend(node_entity.bind_mut().set_components(components));
@@ -369,7 +369,8 @@ impl GodotCompositionWorld {
                 HashMap::new();
 
             //NOTE: Possible performance improvement by also doing a complete update when a majority (exact percentage to be determined when doing this) has changed
-            let update_all_components = changed_component_classes.len() == self.instances_by_component_class.keys().len();
+            let update_all_components =
+                changed_component_classes.len() == self.instances_by_component_class.keys().len();
             let update_all_nodes = changed_nodes.len() == self.node_entities.len();
 
             if update_all_nodes {

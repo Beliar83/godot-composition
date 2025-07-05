@@ -1,3 +1,4 @@
+use crate::scripts::{COMPONENT_WITH_MULTIPLE_FIELDS_PATH, PROCESS_TEST_COMPONENT_PATH};
 use crate::tests::test_object::TestObject;
 use gd_rehearse::itest::gditest;
 use godot::classes::object::ConnectFlags;
@@ -8,7 +9,9 @@ use godot_composition_core::godot_composition_world::GodotCompositionWorld;
 use godot_composition_core::node_entity::NodeEntity;
 use std::cell::RefCell;
 use std::collections::HashSet;
+use std::ops::Deref;
 use std::rc::Rc;
+use std::sync::LazyLock;
 
 #[gditest]
 fn get_node_entity_or_null_should_return_none_for_non_existing_node_entities() {
@@ -97,7 +100,7 @@ fn get_node_entity_or_null_should_return_existing_instance_for_existing_node_ent
 }
 
 #[gditest]
-fn set_component_of_node_adds_component_to_node_entity_after_process() {
+fn set_component_of_node_should_add_a_component_to_node_entity_after_process() {
     let mut instance = GodotCompositionWorld::get_singleton();
     let component = Component::new_gd();
 
@@ -125,7 +128,7 @@ fn set_component_of_node_adds_component_to_node_entity_after_process() {
 }
 
 #[gditest]
-fn set_component_of_node_removes_component_from_node_entity_after_process() {
+fn set_component_of_node_should_remove_a_component_from_node_entity_after_process() {
     let mut instance = GodotCompositionWorld::get_singleton();
     let component = Component::new_gd();
 
@@ -155,7 +158,7 @@ fn set_component_of_node_removes_component_from_node_entity_after_process() {
 }
 
 #[gditest]
-fn set_component_of_node_replaces_component_from_node_entity_after_process() {
+fn set_component_of_node_should_replace_a_component_from_node_entity_after_process() {
     let mut instance = GodotCompositionWorld::get_singleton();
     let existing_component = Component::new_gd();
 
@@ -189,7 +192,7 @@ fn set_component_of_node_replaces_component_from_node_entity_after_process() {
 }
 
 #[gditest]
-fn set_component_of_node_does_not_allow_changing_a_component_of_a_class_that_is_already_staged_for_changing()
+fn set_component_of_node_should_not_allow_changing_a_component_of_a_class_that_is_already_staged_for_changing()
  {
     let mut instance = GodotCompositionWorld::get_singleton();
     let mut component = Component::new_gd();
@@ -244,7 +247,7 @@ fn set_component_of_node_does_not_allow_changing_a_component_of_a_class_that_is_
 }
 
 #[gditest]
-fn set_component_emits_signal_when_a_new_component_is_added() {
+fn set_component_should_emit_a_signal_when_a_new_component_is_added() {
     let mut instance = GodotCompositionWorld::get_singleton();
     let component = Component::new_gd();
 
@@ -296,7 +299,7 @@ fn set_component_emits_signal_when_a_new_component_is_added() {
 }
 
 #[gditest]
-fn set_component_emits_signal_when_a_component_is_removed() {
+fn set_component_should_emit_a_signal_when_a_component_is_removed() {
     let mut instance = GodotCompositionWorld::get_singleton();
     let component = Component::new_gd();
 
@@ -347,7 +350,7 @@ fn set_component_emits_signal_when_a_component_is_removed() {
 }
 
 #[gditest]
-fn set_component_emits_signal_when_a_component_is_replaced() {
+fn set_component_should_emit_a_signal_when_a_component_is_replaced() {
     let mut instance = GodotCompositionWorld::get_singleton();
     let existing_component = Component::new_gd();
 
@@ -472,9 +475,9 @@ fn extract_components(instance: &mut Gd<GodotCompositionWorld>) -> Vec<Dictionar
 }
 
 #[gditest]
-fn process_calls_process_on_components() {
+fn process_should_call_process_on_components() {
     let script = ResourceLoader::singleton()
-        .load("uid://2jgn8yhev0bx")
+        .load(PROCESS_TEST_COMPONENT_PATH)
         .unwrap()
         .cast::<Script>();
     let mut instance = GodotCompositionWorld::get_singleton();
@@ -509,9 +512,9 @@ fn process_calls_process_on_components() {
 }
 
 #[gditest]
-fn physics_process_calls_physics_process_on_components() {
+fn physics_process_should_call_physics_process_on_components() {
     let script = ResourceLoader::singleton()
-        .load("uid://2jgn8yhev0bx")
+        .load(PROCESS_TEST_COMPONENT_PATH)
         .unwrap()
         .cast::<Script>();
     let mut instance = GodotCompositionWorld::get_singleton();
@@ -546,7 +549,7 @@ fn physics_process_calls_physics_process_on_components() {
 }
 
 #[gditest]
-fn do_for_all_components_calls_the_callable() {
+fn do_for_all_components_should_call_the_callable() {
     let mut instance = GodotCompositionWorld::get_singleton();
     let component = Component::new_gd();
 
@@ -581,7 +584,7 @@ fn do_for_all_components_calls_the_callable() {
 }
 
 #[gditest]
-fn do_for_all_components_calls_the_callable_for_each_component() {
+fn do_for_all_components_should_call_the_callable_for_each_component() {
     let mut instance = GodotCompositionWorld::get_singleton();
 
     let classes = [
@@ -633,7 +636,7 @@ fn do_for_all_components_calls_the_callable_for_each_component() {
 }
 
 #[gditest]
-fn do_for_all_components_of_class_calls_the_callable() {
+fn do_for_all_components_of_class_should_call_the_callable() {
     let mut instance = GodotCompositionWorld::get_singleton();
     let component = Component::new_gd();
 
@@ -674,7 +677,7 @@ fn do_for_all_components_of_class_calls_the_callable() {
 }
 
 #[gditest]
-fn do_for_all_components_of_class_calls_the_callable_for_each_component_of_the_given_class() {
+fn do_for_all_components_of_class_should_call_the_callable_for_each_component_of_the_given_class() {
     let mut instance = GodotCompositionWorld::get_singleton();
 
     let class_to_use = StringName::from("test999");
@@ -729,6 +732,225 @@ fn do_for_all_components_of_class_calls_the_callable_for_each_component_of_the_g
     for node in nodes {
         node.free();
     }
+    instance
+        .bind_mut()
+        .remove_all_entities_and_pending_changes();
+}
+
+pub static INT_FIELD_KEY: LazyLock<StringName> = LazyLock::new(|| StringName::from("int_field"));
+pub static STRING_FIELD_KEY: LazyLock<StringName> =
+    LazyLock::new(|| StringName::from("string_field"));
+pub static RESOURCE_FIELD_KEY: LazyLock<StringName> =
+    LazyLock::new(|| StringName::from("resource_field"));
+
+#[gditest]
+fn store_entities_to_scene_should_save_all_entities_and_components_to_the_supplied_node() {
+    let mut instance = GodotCompositionWorld::get_singleton();
+    let mut component = Component::new_gd();
+    let script = ResourceLoader::singleton()
+        .load(COMPONENT_WITH_MULTIPLE_FIELDS_PATH)
+        .unwrap()
+        .cast::<Script>();
+
+    component.set_script(&script.to_variant());
+
+    component.set(INT_FIELD_KEY.deref(), &999.to_variant());
+    component.set(STRING_FIELD_KEY.deref(), &"Zero Escape".to_variant());
+    component.set(RESOURCE_FIELD_KEY.deref(), &script.to_variant());
+
+    let node = Node::new_alloc();
+    let component_class = StringName::from("component_with_multiple_fields");
+    let mut entity = instance.bind_mut().get_or_create_node_entity(node.clone());
+    entity
+        .bind_mut()
+        .set_component(component_class.clone(), Some(component));
+
+    let scene = Node::new_alloc();
+
+    GodotCompositionWorld::get_singleton()
+        .bind_mut()
+        .store_entities_to_scene(scene.clone());
+    let node_entities = scene
+        .get_meta(godot_composition_core::godot_composition_world::NODE_ENTITIES_META_NAME)
+        .to::<Array<NodePath>>();
+    assert_eq!(node_entities.len(), 1);
+    let components = node
+        .get_meta(godot_composition_core::godot_composition_world::COMPONENTS_META_NAME)
+        .to::<Vec<Dictionary>>();
+    assert_eq!(components.len(), 1);
+    let component = components.first().unwrap();
+
+    let stored_base_class =
+        component.get(godot_composition_core::component_with_class::BASE_CLASS_NAME.to_variant());
+    assert_eq!(
+        component.get(
+            godot_composition_core::component_with_class::COMPONENT_CLASS_STRING_NAME.to_variant()
+        ),
+        Some(component_class.to_string().to_variant())
+    );
+    assert_eq!(
+        stored_base_class,
+        Some(Component::class_name().to_string_name().to_variant())
+    );
+
+    let stored_script =
+        component.get(godot_composition_core::component_with_class::SCRIPT_NAME.to_variant());
+    assert_eq!(
+        stored_script,
+        Some("res://src/scripts/component_with_multiple_fields.rs".to_variant())
+    );
+
+    let stored_values = component
+        .get(godot_composition_core::component_with_class::VALUES_NAME.to_variant())
+        .unwrap()
+        .to::<Dictionary>();
+
+    let int_value = stored_values
+        .get(INT_FIELD_KEY.to_variant())
+        .unwrap()
+        .to::<i64>();
+    let string_value = stored_values
+        .get(STRING_FIELD_KEY.to_variant())
+        .unwrap()
+        .to::<String>();
+    let resource_value = stored_values
+        .get(RESOURCE_FIELD_KEY.to_variant())
+        .unwrap()
+        .to::<Gd<Resource>>();
+
+    assert_eq!(int_value, 999);
+    assert_eq!(string_value, "Zero Escape");
+    assert_eq!(resource_value, script.upcast::<Resource>());
+
+    let node = Node::new_alloc();
+
+    let component = Component::new_gd();
+    let another_component_class_1 = StringName::from("another_component_1");
+    let mut entity = instance.bind_mut().get_or_create_node_entity(node.clone());
+    entity
+        .bind_mut()
+        .set_component(another_component_class_1.clone(), Some(component));
+    let component = Component::new_gd();
+    let another_component_class_2 = StringName::from("another_component_2");
+    entity
+        .bind_mut()
+        .set_component(another_component_class_2.clone(), Some(component));
+
+    GodotCompositionWorld::get_singleton()
+        .bind_mut()
+        .store_entities_to_scene(scene.clone());
+
+    let node_entities = scene
+        .get_meta(godot_composition_core::godot_composition_world::NODE_ENTITIES_META_NAME)
+        .to::<Array<NodePath>>();
+    assert_eq!(node_entities.len(), 2);
+    let components = node
+        .get_meta(godot_composition_core::godot_composition_world::COMPONENTS_META_NAME)
+        .to::<Vec<Dictionary>>();
+    assert_eq!(components.len(), 2);
+
+    instance
+        .bind_mut()
+        .remove_all_entities_and_pending_changes();
+}
+
+#[gditest]
+fn set_entities_from_scene_should_load_all_entities_and_components_from_the_supplied_node() {
+    let mut instance = GodotCompositionWorld::get_singleton();
+
+    let mut scene = Node::new_alloc();
+
+    const NODE_NAME: &str = "Node1";
+
+    scene.set_meta(
+        godot_composition_core::godot_composition_world::NODE_ENTITIES_META_NAME,
+        &Array::<NodePath>::from(&[NodePath::from(NODE_NAME)]).to_variant(),
+    );
+
+    let mut node = Node::new_alloc();
+    node.set_name(NODE_NAME);
+    scene.add_child(&node);
+    node.set_owner(&scene);
+
+    let mut components = Array::<Dictionary>::new();
+
+    let mut component_1_data = Dictionary::new();
+
+    component_1_data.set(
+        godot_composition_core::component_with_class::BASE_CLASS_NAME.to_variant(),
+        Component::class_name().to_string_name().to_variant(),
+    );
+    component_1_data.set(
+        godot_composition_core::component_with_class::SCRIPT_NAME.to_variant(),
+        "res://src/scripts/component_with_multiple_fields.rs".to_variant(),
+    );
+
+    let mut component_1_values = Dictionary::new();
+
+    component_1_values.set(INT_FIELD_KEY.to_variant(), 999.to_variant());
+    component_1_values.set(STRING_FIELD_KEY.to_variant(), "Zero Escape");
+    component_1_data.set(
+        godot_composition_core::component_with_class::VALUES_NAME.to_variant(),
+        component_1_values.to_variant(),
+    );
+    let component_with_multiple_fields_name = StringName::from("component_with_multiple_fields");
+    component_1_data.set(
+        godot_composition_core::component_with_class::COMPONENT_CLASS_STRING_NAME.to_variant(),
+        component_with_multiple_fields_name.to_variant(),
+    );
+
+    components.push(&component_1_data);
+
+    let mut component_2_data = Dictionary::new();
+
+    component_2_data.set(
+        godot_composition_core::component_with_class::BASE_CLASS_NAME.to_variant(),
+        Component::class_name().to_string_name().to_variant(),
+    );
+
+    let component_2_values = Dictionary::new();
+    component_2_data.set(
+        godot_composition_core::component_with_class::VALUES_NAME.to_variant(),
+        component_2_values.to_variant(),
+    );
+
+    let another_component_name = StringName::from("another_component");
+    component_2_data.set(
+        godot_composition_core::component_with_class::COMPONENT_CLASS_STRING_NAME.to_variant(),
+        another_component_name.to_variant(),
+    );
+
+    components.push(&component_2_data);
+
+    node.set_meta(
+        godot_composition_core::godot_composition_world::COMPONENTS_META_NAME,
+        &components.to_variant(),
+    );
+
+    GodotCompositionWorld::get_singleton()
+        .bind_mut()
+        .set_entities_from_scene(scene.clone());
+
+    let entity = instance
+        .bind_mut()
+        .get_node_entity_or_null(node.clone())
+        .unwrap();
+    let component_1 = entity
+        .bind()
+        .get_component_of_class_or_null(component_with_multiple_fields_name.clone())
+        .unwrap();
+    assert!(!component_1.get_script().is_nil());
+    assert_eq!(component_1.get(INT_FIELD_KEY.deref()), 999.to_variant());
+    assert_eq!(
+        component_1.get(STRING_FIELD_KEY.deref()),
+        "Zero Escape".to_variant()
+    );
+    let component_2 = entity
+        .bind()
+        .get_component_of_class_or_null(another_component_name.clone())
+        .unwrap();
+    assert!(component_2.get_script().is_nil());
+
     instance
         .bind_mut()
         .remove_all_entities_and_pending_changes();
