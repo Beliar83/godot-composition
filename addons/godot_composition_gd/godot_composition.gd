@@ -11,7 +11,11 @@ func get_gd_script_files(directory: EditorFileSystemDirectory) -> Array[String]:
 		for i in directory.get_file_count():
 			if directory.get_file_type(i) != "GDScript" || directory.get_file_script_class_extends(i) != "Component":
 				continue
-			found_scripts.push_back(directory.get_file_path(i))
+			var path = directory.get_file_path(i)
+			var script : Script = load(path)
+			if not script.is_abstract():
+				found_scripts.push_back(path)
+
 		for i in directory.get_subdir_count():
 			directories.push_back(directory.get_subdir(i))
 		directory = directories.pop_back()
