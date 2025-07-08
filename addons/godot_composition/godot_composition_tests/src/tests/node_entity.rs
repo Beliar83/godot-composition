@@ -256,3 +256,82 @@ fn set_components_should_replace_all_components() {
         "Zero Escape".to_variant()
     );
 }
+
+#[gditest]
+fn set_components_should_emit_a_signal_for_each_component() {
+    let mut entity = NodeEntity::new_gd();
+    let old_component_name = StringName::from("Old component");
+    entity
+        .bind_mut()
+        .set_component(old_component_name.clone(), Some(Component::new_gd()));
+
+    let mut components = Vec::<Dictionary>::new();
+
+    let mut component_1_data = Dictionary::new();
+
+    component_1_data.set(
+        godot_composition_core::component_with_class::BASE_CLASS_NAME.to_variant(),
+        Component::class_name().to_string_name().to_variant(),
+    );
+
+    let component_1_values = Dictionary::new();
+
+    component_1_data.set(
+        godot_composition_core::component_with_class::VALUES_NAME.to_variant(),
+        component_1_values.to_variant(),
+    );
+    let component_name = StringName::from("component");
+    component_1_data.set(
+        godot_composition_core::component_with_class::COMPONENT_CLASS_STRING_NAME.to_variant(),
+        component_name.to_variant(),
+    );
+
+    components.push(component_1_data);
+
+    let mut component_2_data = Dictionary::new();
+
+    component_2_data.set(
+        godot_composition_core::component_with_class::BASE_CLASS_NAME.to_variant(),
+        Component::class_name().to_string_name().to_variant(),
+    );
+
+    let component_2_values = Dictionary::new();
+    component_2_data.set(
+        godot_composition_core::component_with_class::VALUES_NAME.to_variant(),
+        component_2_values.to_variant(),
+    );
+
+    let another_component_name = StringName::from("another_component");
+    component_2_data.set(
+        godot_composition_core::component_with_class::COMPONENT_CLASS_STRING_NAME.to_variant(),
+        another_component_name.to_variant(),
+    );
+
+    components.push(component_2_data);
+
+    let added_components = Dictionary::new();
+    let removed_components = Dictionary::new();
+
+    {
+        let mut added_components = added_components.clone();
+        let mut removed_components = removed_components.clone();
+        entity.bind_mut().signals().component_changed().connect(
+            move |_, component_class, component, old_component| {
+                if component.is_some() {
+                    added_components.set(component_class, Variant::nil());
+                } else if old_component.is_some() {
+                    removed_components.set(component_class, Variant::nil());
+                }
+            },
+        );
+    }
+
+    entity.bind_mut().set_components(components);
+
+    assert!(removed_components.contains_key(old_component_name));
+    assert_eq!(removed_components.len(), 1);
+
+    assert!(added_components.contains_key(component_name));
+    assert!(added_components.contains_key(another_component_name));
+    assert_eq!(added_components.len(), 2);
+}

@@ -1,6 +1,7 @@
 use crate::component::Component;
 use crate::node_entity::NodeEntity;
 use godot::classes::Engine;
+use godot::meta::AsArg;
 use godot::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
@@ -168,7 +169,21 @@ impl GodotCompositionWorld {
                     .unwrap_or_else(|| panic!("Node at path {} does not exist", path));
                 let mut node_entity = self.get_or_create_node_entity(node.clone());
                 let components = node.get_meta(COMPONENTS_META_NAME).to::<Vec<Dictionary>>();
-                component_classes.extend(node_entity.bind_mut().set_components(components));
+                let added_components = node_entity.bind_mut().set_components(components);
+                for component_class in added_components {
+                    let component = node_entity
+                        .bind()
+                        .get_component_of_class_or_null(component_class.clone());
+                    self.signals().component_changed().emit(
+                        node_entity.into_arg(),
+                        &component_class,
+                        &component,
+                        None,
+                    );
+
+                    component_classes.insert(component_class);
+                }
+
                 node_entities.insert(node_entity);
             }
             self.update_caches(node_entities, component_classes);
@@ -266,9 +281,20 @@ impl GodotCompositionWorld {
     pub fn remove_all_entities_and_pending_changes(&mut self) {
         #[allow(clippy::mutable_key_type)]
         let mut changed_nodes: HashSet<Gd<NodeEntity>> = HashSet::new();
-        for node_entity in self.node_entities.values_mut() {
-            for mut component in node_entity.bind_mut().components.clone() {
+        for node_entity in self.node_entities.clone().values_mut() {
+            #[allow(clippy::mutable_key_type)]
+            let mut changed_components = HashSet::new();
+            for mut component in node_entity.clone().bind_mut().components.clone() {
                 component.component.bind_mut().set_node_entity(None);
+                changed_components.insert(component);
+            }
+            for component in changed_components {
+                self.signals().component_changed().emit(
+                    node_entity.into_arg(),
+                    &component.component_class,
+                    None,
+                    &Some(component.component),
+                );
             }
             changed_nodes.insert(node_entity.clone());
         }

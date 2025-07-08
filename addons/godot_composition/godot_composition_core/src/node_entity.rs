@@ -123,7 +123,12 @@ impl NodeEntity {
             })
             .collect();
         component_classes.extend(components.iter().map(|x| x.component_class.clone()));
-        self.components = HashSet::from_iter(components);
+        for component in self.components.clone() {
+            self.set_component(component.component_class.clone(), None);
+        }
+        for component in components {
+            self.set_component(component.component_class.clone(), Some(component.component));
+        }
         component_classes
     }
 

@@ -955,3 +955,160 @@ fn set_entities_from_scene_should_load_all_entities_and_components_from_the_supp
         .bind_mut()
         .remove_all_entities_and_pending_changes();
 }
+
+#[gditest]
+fn set_entities_from_scene_should_emit_component_changed_for_all_entities() {
+    let mut instance = GodotCompositionWorld::get_singleton();
+
+    let mut scene = Node::new_alloc();
+
+    const NODE_1_NAME: &str = "Node1";
+    const NODE_2_NAME: &str = "Node2";
+
+    scene.set_meta(
+        godot_composition_core::godot_composition_world::NODE_ENTITIES_META_NAME,
+        &Array::<NodePath>::from(&[NodePath::from(NODE_1_NAME), NodePath::from(NODE_2_NAME)]).to_variant(),
+    );
+
+    let mut node_1 = Node::new_alloc();
+    node_1.set_name(NODE_1_NAME);
+    scene.add_child(&node_1);
+    node_1.set_owner(&scene);
+
+    let mut components = Array::<Dictionary>::new();
+
+    let mut component_1_data = Dictionary::new();
+
+    component_1_data.set(
+        godot_composition_core::component_with_class::BASE_CLASS_NAME.to_variant(),
+        Component::class_name().to_string_name().to_variant(),
+    );
+    let component_1_values = Dictionary::new();
+
+    component_1_data.set(
+        godot_composition_core::component_with_class::VALUES_NAME.to_variant(),
+        component_1_values.to_variant(),
+    );
+    let component_1_name = StringName::from("component");
+    component_1_data.set(
+        godot_composition_core::component_with_class::COMPONENT_CLASS_STRING_NAME.to_variant(),
+        component_1_name.to_variant(),
+    );
+
+    components.push(&component_1_data);
+
+    let mut component_2_data = Dictionary::new();
+
+    component_2_data.set(
+        godot_composition_core::component_with_class::BASE_CLASS_NAME.to_variant(),
+        Component::class_name().to_string_name().to_variant(),
+    );
+
+    let component_2_values = Dictionary::new();
+    component_2_data.set(
+        godot_composition_core::component_with_class::VALUES_NAME.to_variant(),
+        component_2_values.to_variant(),
+    );
+
+    let component_2_name = StringName::from("another_component");
+    component_2_data.set(
+        godot_composition_core::component_with_class::COMPONENT_CLASS_STRING_NAME.to_variant(),
+        component_2_name.to_variant(),
+    );
+
+    components.push(&component_2_data);
+
+    node_1.set_meta(
+        godot_composition_core::godot_composition_world::COMPONENTS_META_NAME,
+        &components.to_variant(),
+    );
+
+    let mut components = Array::<Dictionary>::new();
+
+    let mut component_1_data = Dictionary::new();
+
+    component_1_data.set(
+        godot_composition_core::component_with_class::BASE_CLASS_NAME.to_variant(),
+        Component::class_name().to_string_name().to_variant(),
+    );
+    let component_1_values = Dictionary::new();
+
+    component_1_data.set(
+        godot_composition_core::component_with_class::VALUES_NAME.to_variant(),
+        component_1_values.to_variant(),
+    );
+    component_1_data.set(
+        godot_composition_core::component_with_class::COMPONENT_CLASS_STRING_NAME.to_variant(),
+        component_1_name.to_variant(),
+    );
+
+    components.push(&component_1_data);
+
+    let mut node_2 = Node::new_alloc();
+    node_2.set_name(NODE_2_NAME);
+    scene.add_child(&node_2);
+    node_2.set_owner(&scene);
+
+    node_2.set_meta(
+        godot_composition_core::godot_composition_world::COMPONENTS_META_NAME,
+        &components.to_variant(),
+    );
+
+    let old_component_1_name = StringName::from("old_component");
+    let old_component_2_name = StringName::from("old_component_2");
+
+    let mut entity = instance.bind_mut().get_or_create_node_entity(node_1.clone());
+    entity.bind_mut().set_component(old_component_1_name.clone(), Some(Component::new_gd()));
+
+    let mut entity = instance.bind_mut().get_or_create_node_entity(node_2.clone());
+    entity.bind_mut().set_component(old_component_1_name.clone(), Some(Component::new_gd()));
+    entity.bind_mut().set_component(old_component_2_name.clone(), Some(Component::new_gd()));
+
+    let added_components_node_1 = Dictionary::new();
+    let removed_components_node_1 = Dictionary::new();
+    let added_components_node_2 = Dictionary::new();
+    let removed_components_node_2 = Dictionary::new();
+    
+    {
+        let mut added_components_node_1 = added_components_node_1.clone();
+        let mut removed_components_node_1 = removed_components_node_1.clone();
+        let mut added_components_node_2 = added_components_node_2.clone();
+        let mut removed_components_node_2 = removed_components_node_2.clone();
+
+        instance.bind_mut().signals().component_changed().connect(move |entity, component_class, component, old_component| {
+            if component.is_some() {
+                if entity.bind().get_node().unwrap().get_name().to_string() == NODE_1_NAME {
+                    added_components_node_1.set(component_class, Variant::nil());
+                } else if entity.bind().get_node().unwrap().get_name().to_string() == NODE_2_NAME {
+                    added_components_node_2.set(component_class, Variant::nil());
+                }
+            } else if old_component.is_some() {
+                if entity.bind().get_node().unwrap().get_name().to_string() == NODE_1_NAME {
+                    removed_components_node_1.set(component_class, Variant::nil());
+                } else if entity.bind().get_node().unwrap().get_name().to_string() == NODE_2_NAME {
+                    removed_components_node_2.set(component_class, Variant::nil());
+                }
+            }
+        });
+    }
+
+    instance.bind_mut().set_entities_from_scene(scene.clone());
+
+    assert!(removed_components_node_1.contains_key(old_component_1_name.clone()));
+    assert_eq!(removed_components_node_1.len(), 1);
+
+    assert!(added_components_node_1.contains_key(component_1_name.clone()));
+    assert!(added_components_node_1.contains_key(component_2_name.clone()));
+    assert_eq!(added_components_node_1.len(), 2);
+
+    assert!(removed_components_node_2.contains_key(old_component_1_name.clone()));
+    assert!(removed_components_node_2.contains_key(old_component_2_name));
+    assert_eq!(removed_components_node_2.len(), 2);
+
+    assert!(added_components_node_2.contains_key(component_1_name));
+    assert_eq!(added_components_node_2.len(), 1);
+
+    instance
+        .bind_mut()
+        .remove_all_entities_and_pending_changes();
+}
