@@ -71,7 +71,7 @@ impl GodotCompositionWorld {
 
     #[func]
     /// Return all components, grouped by Node
-    pub fn get_all_components(&mut self) -> Dictionary {
+    pub fn get_all_components(&self) -> Dictionary {
         self.all_instances.duplicate_shallow()
     }
 
@@ -388,9 +388,7 @@ impl GodotCompositionWorld {
         changed_component_classes: HashSet<StringName>,
     ) {
         if !changed_nodes.is_empty() {
-            self.all_instances_internal.retain(|(_, _, x)| {
-                changed_nodes.contains(&x.bind().get_node_entity().unwrap_or_default())
-            });
+            self.all_instances_internal.clear();
             let mut instances_by_component_class: HashMap<StringName, HashSet<Gd<Component>>> =
                 HashMap::new();
 
